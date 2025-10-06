@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "336373776261",
+    "project_id": "scilencear",
+    "storage_bucket": "scilencear.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:336373776261:android:068e563aee11cb307c8eec",
+        "android_client_info": {
+          "package_name": "com.WortexStudio.SciLenceAR"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAj4OfMozPm_kUKFWYa1LuHlRkjCiUewPE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
