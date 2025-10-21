@@ -33,26 +33,30 @@ public class FirebaseAuthManager : MonoBehaviour
     public TMP_Text loginErrorText;
     public TMP_Text registerErrorText;
 
-    private void Awake()
+    private void Start()
     {
-        // Hide error texts initially
+          // Hide error texts initially
         if (loginErrorText) loginErrorText.gameObject.SetActive(false);
         if (registerErrorText) registerErrorText.gameObject.SetActive(false);
+        StartCoroutine(CheckAndFixDependenciesAsync());
 
-        // Check that all of the necessary dependencies for firebase are present on the system
-        FirebaseApp.CheckAndFixDependenciesAsync().ContinueWith(task =>
+    }
+  
+
+    private IEnumerator CheckAndFixDependenciesAsync()
+    {
+        var dependencyTask = FirebaseApp.CheckAndFixDependenciesAsync();
+        yield return new WaitUntil(() => dependencyTask.IsCompleted);
+        if (dependencyStatus == DependencyStatus.Available)
         {
-            dependencyStatus = task.Result;
-
-            if (dependencyStatus == DependencyStatus.Available)
-            {
-                InitializeFirebase();
-            }
-            else
-            {
-                Debug.LogError("Could not resolve all firebase dependencies: " + dependencyStatus);
-            }
-        });
+            InitializeFirebase();
+            yield return new WaitForEndOfFrame();
+            StartCoroutine(CheckForAutoLogin());
+        }
+        else
+        {
+            Debug.LogError("Could not resolve all firebase dependencies: " + dependencyStatus);
+        }
     }
 
     void InitializeFirebase()
@@ -62,6 +66,35 @@ public class FirebaseAuthManager : MonoBehaviour
 
         auth.StateChanged += AuthStateChanged;
         AuthStateChanged(this, null);
+    }
+
+    private IEnumerator CheckForAutoLogin()
+    {
+        if(user != null)
+        {
+            var reloadUserTask =user.ReloadAsync();
+            yield return new WaitUntil(() => reloadUserTask.IsCompleted);
+            AutoLogin();
+        }
+        else
+        {
+            UIManager.Instance.OpenLoginPanel();
+
+        }
+    }
+
+    private void AutoLogin()
+    {
+        if(user != null)
+        {
+            References.userName = user.DisplayName;
+            UnityEngine.SceneManagement.SceneManager.LoadScene("GameScene");
+        }
+        else
+        {
+            UIManager.Instance.OpenLoginPanel();
+
+        }
     }
 
     // Track state changes of the auth object.
