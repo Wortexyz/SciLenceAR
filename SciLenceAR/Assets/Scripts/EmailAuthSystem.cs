@@ -184,6 +184,14 @@ public class FirebaseAuthManager : MonoBehaviour
         StartCoroutine(RegisterAsync(nameRegisterField.text, emailRegisterField.text, passwordRegisterField.text, confirmPasswordRegisterField.text));
     }
 
+    public void LogOut()
+    {
+        if(auth != null && user != null)
+        {
+            auth.SignOut();
+        }
+    }
+
     private IEnumerator RegisterAsync(string name, string email, string password, string confirmPassword)
     {
         if (name == "")
