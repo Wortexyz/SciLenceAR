@@ -1,3 +1,4 @@
+// Assets/Scripts/UI/ContentListManager.cs (Debug)
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -10,59 +11,48 @@ public class ContentListManager : MonoBehaviour
 
     void Start()
     {
+        Debug.Log("[ContentListManager] Start() on " + gameObject.name + " (active=" + gameObject.activeInHierarchy + ")");
         LoadAllContent();
     }
 
     void LoadAllContent()
     {
         var all = Resources.LoadAll<ContentDefinition>("Content");
+        int count = (all == null) ? 0 : all.Length;
+        Debug.Log($"[ContentListManager] Resources.LoadAll returned {count} asset(s).");
+
+        if (count == 0)
+        {
+            Debug.LogWarning("[ContentListManager] No ContentDefinition assets found under Assets/Resources/Content. Make sure they are ScriptableObject assets and inside that folder.");
+            return;
+        }
+
         foreach (var def in all)
         {
+            Debug.Log($"[ContentListManager] Found asset: id='{def.contentId}' title='{def.title}' subject='{def.subject}'");
             var parent = GetParentForSubject(def.subject);
+            Debug.Log($"[ContentListManager] Parent for subject '{def.subject}' = {(parent == null ? "NULL" : parent.name)}");
             if (parent == null) continue;
-            CreateCardForContent(def, parent);
+
+            if (lessonCardPrefab == null)
+            {
+                Debug.LogError("[ContentListManager] lessonCardPrefab is NULL. Assign it in the inspector on Appmanager.");
+                return;
+            }
+
+            var go = Instantiate(lessonCardPrefab, parent);
+            go.transform.localScale = Vector3.one;
+            Debug.Log("[ContentListManager] Instantiated lesson card for " + def.contentId + " under " + parent.name);
         }
     }
 
     RectTransform GetParentForSubject(string subject)
     {
         if (string.IsNullOrEmpty(subject)) return null;
-        subject = subject.ToLower().Trim();
-        if (subject == "physics") return physicsContentParent;
-        if (subject == "chemistry") return chemistryContentParent;
-        if (subject == "biology") return biologyContentParent;
+        string s = subject.Trim().ToLowerInvariant();
+        if (s == "physics") return physicsContentParent;
+        if (s == "chemistry") return chemistryContentParent;
+        if (s == "biology") return biologyContentParent;
         return null;
-    }
-
-    void CreateCardForContent(ContentDefinition def, RectTransform parent)
-    {
-        var go = Instantiate(lessonCardPrefab, parent);
-        go.transform.localScale = Vector3.one;
-
-        var title = go.transform.Find("TitleText")?.GetComponent<Text>();
-        if (title != null) title.text = def.title;
-
-        var buttons = go.GetComponentsInChildren<Button>(true);
-        foreach (var b in buttons)
-        {
-            if (b.name == "BtnWatch") b.onClick.AddListener(() => UIManager.I.OnWatchClicked(def));
-            else if (b.name == "BtnNotes") b.onClick.AddListener(() => UIManager.I.OnNotesClicked(def));
-            else if (b.name == "BtnStartAR") b.onClick.AddListener(() => UIManager.I.OnStartARClicked(def));
-        }
-
-        // set status icon if completed (async)
-        var pm = FindObjectOfType<ProgressManager>();
-        if (pm != null)
-        {
-            _ = pm.GetProgressAsync(def.contentId).ContinueWith(t =>
-            {
-                var prog = t.Result;
-                if (prog != null && prog.completed)
-                {
-                    var icon = go.transform.Find("StatusIcon")?.GetComponent<Image>();
-                    if (icon != null) icon.color = Color.green;
-                }
-            });
-        }
     }
 }

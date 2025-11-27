@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ead79b45e51fb95499485fce341edb97, type: 3}
+  m_Name: CHE_Molecule_01
+  m_EditorClassIdentifier: 
+  contentId: che_molecule_01
+  subject: Chemistry
+  title: Molecules
+  notes: Molecules are tiny particles that make up everything around us, like water,
+    air, plants, and your own body cells. A molecule is made when two or more atoms
+    (even smaller particles) join together and stick by chemical bonds
+  videoSource: 0
+  videoUrlOrYouTubeId: https://drive.google.com/uc?export=download&id=1UotPQeuA7yveCgU-QdozZzpDe_6td6jM
+  pdfUrl: https://drive.google.com/uc?export=download&id=1L5bBkQ6NkbHMkgIvtUDrC-uKLCmrSPZi
+  arPrefab: {fileID: 0}
