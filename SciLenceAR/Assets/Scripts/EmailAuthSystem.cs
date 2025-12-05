@@ -16,7 +16,6 @@ public class FirebaseAuthManager : MonoBehaviour
 
     [Space]
     [Header("Login")]
-    // If you're using TextMeshPro input fields, replace InputField with TMP_InputField in inspector and code.
     public InputField emailLoginField;
     public InputField passwordLoginField;
     public Button loginButton;
@@ -31,26 +30,24 @@ public class FirebaseAuthManager : MonoBehaviour
 
     [Space]
     [Header("Error & Status Texts")]
-    // Errors:
     public TMP_Text loginErrorText;
     public TMP_Text registerErrorText;
-    // Status messages for each panel:
     public TMP_Text loginStatusText;
     public TMP_Text registerStatusText;
 
-    [Tooltip("If true the manager will LoadScene(\"GameScene\") after sign in. If false, it will just open the subject panel UI.")]
+    [Header("Reset Password Settings")]
+    public int resetCooldownSeconds = 60;
+
+    [Tooltip("If true loads a scene after sign-in. If false opens subject panel.")]
     public bool loadGameSceneAfterSignIn = false;
-    [Tooltip("Name of scene to load when using scene loading.")]
     public string gameSceneName = "GameScene";
 
-    [Tooltip("Minimum password length to validate locally before sending to Firebase.")]
     public int minPasswordLength = 6;
 
-    private void Start()
+    void Start()
     {
         if (loginErrorText) loginErrorText.gameObject.SetActive(false);
         if (registerErrorText) registerErrorText.gameObject.SetActive(false);
-
         if (loginStatusText) loginStatusText.gameObject.SetActive(false);
         if (registerStatusText) registerStatusText.gameObject.SetActive(false);
 
@@ -72,10 +69,9 @@ public class FirebaseAuthManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Could not resolve all firebase dependencies: " + dependencyStatus);
-            // Use registerStatusText as fallback to show the dependency error if present, otherwise log only.
+            Debug.LogError("Firebase dependency error: " + dependencyStatus);
             if (registerStatusText)
-                StartCoroutine(ShowError(registerStatusText, "Firebase dependencies unavailable: " + dependencyStatus, 5f));
+                StartCoroutine(ShowError(registerStatusText, "Firebase unavailable.", 5f));
         }
     }
 
@@ -83,7 +79,6 @@ public class FirebaseAuthManager : MonoBehaviour
     {
         auth = FirebaseAuth.DefaultInstance;
 
-        // avoid duplicate subscriptions
         auth.StateChanged -= AuthStateChanged;
         auth.StateChanged += AuthStateChanged;
 
@@ -95,7 +90,7 @@ public class FirebaseAuthManager : MonoBehaviour
     {
         if (auth == null)
         {
-            if (UIManager.Instance != null) UIManager.Instance.OpenHomePanel();
+            UIManager.Instance?.OpenHomePanel();
             yield break;
         }
 
@@ -105,7 +100,6 @@ public class FirebaseAuthManager : MonoBehaviour
             var reloadTask = user.ReloadAsync();
             yield return new WaitUntil(() => reloadTask.IsCompleted);
 
-            // refresh user ref
             user = auth.CurrentUser;
             if (user != null)
             {
@@ -114,24 +108,25 @@ public class FirebaseAuthManager : MonoBehaviour
             }
         }
 
-        if (UIManager.Instance != null) UIManager.Instance.OpenHomePanel();
+        UIManager.Instance?.OpenHomePanel();
     }
 
+    // Navigate to subject panel after login/register
     private void GoToSubject()
     {
-        if (auth.CurrentUser != null) References.userName = auth.CurrentUser.DisplayName;
+        if (auth.CurrentUser != null)
+            References.userName = auth.CurrentUser.DisplayName;
 
         if (loadGameSceneAfterSignIn)
-        {
             SceneManager.LoadScene(gameSceneName);
-        }
         else
-        {
-            if (UIManager.Instance != null) UIManager.Instance.OpenSubjectPanel();
-        }
+            UIManager.Instance?.OpenSubjectPanel();
+
+        var pm = FindObjectOfType<ProfileManager>();
+        pm?.RefreshProfile();
     }
 
-    private void AuthStateChanged(object sender, System.EventArgs eventArgs)
+    private void AuthStateChanged(object sender, System.EventArgs e)
     {
         if (auth == null) return;
 
@@ -142,7 +137,7 @@ public class FirebaseAuthManager : MonoBehaviour
             if (!signedIn && user != null)
             {
                 Debug.Log("Signed out: " + user.UserId);
-                if (UIManager.Instance != null) UIManager.Instance.OpenHomePanel();
+                UIManager.Instance?.OpenHomePanel();
             }
 
             user = auth.CurrentUser;
@@ -161,33 +156,25 @@ public class FirebaseAuthManager : MonoBehaviour
             auth.StateChanged -= AuthStateChanged;
     }
 
-    // ---------- LOGIN ----------
+    // ------------------- LOGIN -------------------
     public void Login()
     {
-        // If UIManager has a dedicated login panel and it is hidden, open it first
-        if (UIManager.Instance != null && UIManager.Instance.loginPanel != null && !UIManager.Instance.loginPanel.activeSelf)
+        if (UIManager.Instance != null &&
+            UIManager.Instance.loginPanel != null &&
+            !UIManager.Instance.loginPanel.activeSelf)
         {
-            if (UIManager.Instance.homePanel != null) UIManager.Instance.homePanel.SetActive(false);
+            UIManager.Instance.homePanel?.SetActive(false);
             UIManager.Instance.loginPanel.SetActive(true);
 
-            if (loginErrorText) loginErrorText.gameObject.SetActive(false);
-            if (loginStatusText) loginStatusText.gameObject.SetActive(false);
+            loginErrorText?.gameObject.SetActive(false);
+            loginStatusText?.gameObject.SetActive(false);
 
-            // Stop here — user now sees login UI
             return;
         }
 
-        if (auth == null)
-        {
-            Debug.LogError("Auth not initialized yet.");
-            StartCoroutine(ShowError(loginErrorText, "Auth not ready. Try again."));
-            return;
-        }
+        string email = emailLoginField?.text.Trim();
+        string password = passwordLoginField?.text;
 
-        string email = emailLoginField != null ? emailLoginField.text.Trim() : string.Empty;
-        string password = passwordLoginField != null ? passwordLoginField.text : string.Empty;
-
-        // local validation
         if (string.IsNullOrEmpty(email))
         {
             StartCoroutine(ShowError(loginErrorText, "Email is empty"));
@@ -195,7 +182,7 @@ public class FirebaseAuthManager : MonoBehaviour
         }
         if (!IsValidEmail(email))
         {
-            StartCoroutine(ShowError(loginErrorText, "Email format invalid"));
+            StartCoroutine(ShowError(loginErrorText, "Invalid email format"));
             return;
         }
         if (string.IsNullOrEmpty(password))
@@ -210,108 +197,81 @@ public class FirebaseAuthManager : MonoBehaviour
     private IEnumerator LoginAsync(string email, string password)
     {
         SetButtonsInteractable(false);
-        if (loginStatusText) { loginStatusText.text = "Signing in..."; loginStatusText.gameObject.SetActive(true); }
+        loginStatusText.text = "Signing in...";
+        loginStatusText.gameObject.SetActive(true);
 
-        var loginTask = auth.SignInWithEmailAndPasswordAsync(email, password);
-        yield return new WaitUntil(() => loginTask.IsCompleted);
+        var task = auth.SignInWithEmailAndPasswordAsync(email, password);
+        yield return new WaitUntil(() => task.IsCompleted);
 
         SetButtonsInteractable(true);
-        if (loginStatusText) loginStatusText.gameObject.SetActive(false);
+        loginStatusText.gameObject.SetActive(false);
 
-        if (loginTask.Exception != null)
+        if (task.Exception != null)
         {
-            var baseEx = loginTask.Exception.GetBaseException();
-            FirebaseException firebaseException = baseEx as FirebaseException;
-            string failedMessage = "Login Failed! ";
+            FirebaseException fe = task.Exception.GetBaseException() as FirebaseException;
+            string msg = "Login failed: ";
 
-            if (firebaseException != null)
+            if (fe != null)
             {
-                // safe parse of error code
-                int errorCode = firebaseException.ErrorCode;
-                AuthError authError = (AuthError)errorCode;
-                switch (authError)
+                switch ((AuthError)fe.ErrorCode)
                 {
-                    case AuthError.InvalidEmail: failedMessage += "Email is invalid"; break;
-                    case AuthError.WrongPassword: failedMessage += "Wrong password"; break;
-                    case AuthError.MissingEmail: failedMessage += "Email is missing"; break;
-                    case AuthError.MissingPassword: failedMessage += "Password is missing"; break;
-                    case AuthError.UserNotFound: failedMessage += "No user found with this email"; break;
-                    case AuthError.UserDisabled: failedMessage += "User account disabled"; break;
-                    default: failedMessage += firebaseException.Message; break;
+                    case AuthError.InvalidEmail: msg += "Invalid Email"; break;
+                    case AuthError.WrongPassword: msg += "Wrong Password"; break;
+                    case AuthError.UserNotFound: msg += "User not found"; break;
+                    default: msg += fe.Message; break;
                 }
             }
-            else
-            {
-                failedMessage += baseEx != null ? baseEx.Message : "Unexpected error";
-            }
 
-            StartCoroutine(ShowError(loginErrorText, failedMessage));
+            StartCoroutine(ShowError(loginErrorText, msg));
         }
         else
         {
-            user = loginTask.Result.User;
+            user = task.Result.User;
             References.userName = user.DisplayName;
             GoToSubject();
         }
     }
 
-    // ---------- REGISTRATION ----------
+    // ------------------- REGISTER -------------------
     public void Register()
     {
-        // If UIManager has a dedicated register panel and it is hidden, open it first
-        if (UIManager.Instance != null && UIManager.Instance.registerPanel != null && !UIManager.Instance.registerPanel.activeSelf)
+        if (UIManager.Instance != null &&
+            UIManager.Instance.registerPanel != null &&
+            !UIManager.Instance.registerPanel.activeSelf)
         {
-            if (UIManager.Instance.homePanel != null) UIManager.Instance.homePanel.SetActive(false);
+            UIManager.Instance.homePanel?.SetActive(false);
             UIManager.Instance.registerPanel.SetActive(true);
 
-            if (registerErrorText) registerErrorText.gameObject.SetActive(false);
-            if (registerStatusText) registerStatusText.gameObject.SetActive(false);
-
-            // Stop here — user now sees register UI
+            registerErrorText?.gameObject.SetActive(false);
+            registerStatusText?.gameObject.SetActive(false);
             return;
         }
 
-        string name = nameRegisterField != null ? nameRegisterField.text.Trim() : string.Empty;
-        string email = emailRegisterField != null ? emailRegisterField.text.Trim() : string.Empty;
-        string password = passwordRegisterField != null ? passwordRegisterField.text : string.Empty;
-        string confirmPassword = confirmPasswordRegisterField != null ? confirmPasswordRegisterField.text : string.Empty;
-
-        StartCoroutine(RegisterAsync(name, email, password, confirmPassword));
+        StartCoroutine(RegisterAsync(
+            nameRegisterField.text.Trim(),
+            emailRegisterField.text.Trim(),
+            passwordRegisterField.text,
+            confirmPasswordRegisterField.text
+        ));
     }
 
     private IEnumerator RegisterAsync(string name, string email, string password, string confirmPassword)
     {
-        // local validation before network call
         if (string.IsNullOrEmpty(name))
         {
-            StartCoroutine(ShowError(registerErrorText, "User name is empty"));
+            StartCoroutine(ShowError(registerErrorText, "Name is empty"));
             yield break;
         }
-
-        if (string.IsNullOrEmpty(email))
-        {
-            StartCoroutine(ShowError(registerErrorText, "Email field is empty"));
-            yield break;
-        }
-
         if (!IsValidEmail(email))
         {
-            StartCoroutine(ShowError(registerErrorText, "Email format invalid"));
+            StartCoroutine(ShowError(registerErrorText, "Invalid email format"));
             yield break;
         }
-
-        if (string.IsNullOrEmpty(password))
-        {
-            StartCoroutine(ShowError(registerErrorText, "Password is empty"));
-            yield break;
-        }
-
         if (password.Length < minPasswordLength)
         {
             StartCoroutine(ShowError(registerErrorText, $"Password must be at least {minPasswordLength} characters"));
             yield break;
         }
-
         if (password != confirmPassword)
         {
             StartCoroutine(ShowError(registerErrorText, "Passwords do not match"));
@@ -319,158 +279,158 @@ public class FirebaseAuthManager : MonoBehaviour
         }
 
         SetButtonsInteractable(false);
-        if (registerStatusText) { registerStatusText.text = "Registering..."; registerStatusText.gameObject.SetActive(true); }
+        registerStatusText.text = "Registering...";
+        registerStatusText.gameObject.SetActive(true);
 
-        var registerTask = auth.CreateUserWithEmailAndPasswordAsync(email, password);
-        yield return new WaitUntil(() => registerTask.IsCompleted);
+        var task = auth.CreateUserWithEmailAndPasswordAsync(email, password);
+        yield return new WaitUntil(() => task.IsCompleted);
 
         SetButtonsInteractable(true);
-        if (registerStatusText) registerStatusText.gameObject.SetActive(false);
+        registerStatusText.gameObject.SetActive(false);
 
-        if (registerTask.Exception != null)
+        if (task.Exception != null)
         {
-            var baseEx = registerTask.Exception.GetBaseException();
-            FirebaseException firebaseException = baseEx as FirebaseException;
-            string failedMessage = "Registration Failed! ";
-
-            if (firebaseException != null)
+            FirebaseException fe = task.Exception.GetBaseException() as FirebaseException;
+            string msg = "Registration failed: ";
+            if (fe != null)
             {
-                int errorCode = firebaseException.ErrorCode;
-                AuthError authError = (AuthError)errorCode;
-                switch (authError)
+                switch ((AuthError)fe.ErrorCode)
                 {
-                    case AuthError.InvalidEmail: failedMessage += "Email is invalid"; break;
-                    case AuthError.WeakPassword: failedMessage += "Password is too weak"; break;
-                    case AuthError.EmailAlreadyInUse: failedMessage += "Email already in use"; break;
-                    default: failedMessage += firebaseException.Message; break;
+                    case AuthError.EmailAlreadyInUse: msg += "Email already in use"; break;
+                    case AuthError.WeakPassword: msg += "Password too weak"; break;
+                    default: msg += fe.Message; break;
                 }
             }
-            else
-            {
-                failedMessage += baseEx != null ? baseEx.Message : "Unexpected error";
-            }
-
-            StartCoroutine(ShowError(registerErrorText, failedMessage));
+            StartCoroutine(ShowError(registerErrorText, msg));
             yield break;
         }
 
-        user = registerTask.Result.User;
+        user = task.Result.User;
 
-        // Update display name
-        UserProfile profile = new UserProfile { DisplayName = name };
-        var updateTask = user.UpdateUserProfileAsync(profile);
-        yield return new WaitUntil(() => updateTask.IsCompleted);
+        // Set display name
+        var profileTask = user.UpdateUserProfileAsync(
+            new UserProfile { DisplayName = name }
+        );
+        yield return new WaitUntil(() => profileTask.IsCompleted);
 
-        if (updateTask.Exception != null)
-        {
-            // cleanup and inform - await DeleteAsync to avoid compiler warning
-            var delTask = user.DeleteAsync();
-            yield return new WaitUntil(() => delTask.IsCompleted);
-
-            StartCoroutine(ShowError(registerErrorText, "Profile update failed"));
-            yield break;
-        }
-
-        // Optionally send verification email
-        var sendEmailTask = user.SendEmailVerificationAsync();
-        yield return new WaitUntil(() => sendEmailTask.IsCompleted);
-        // ignore failure here but log it
-        if (sendEmailTask.Exception != null)
-            Debug.LogWarning("Verification email send failed: " + sendEmailTask.Exception.GetBaseException().Message);
-
-        // After registration Firebase signs the user in.
         GoToSubject();
     }
 
     public void LogOut()
     {
-        if (auth != null)
-        {
-            auth.SignOut();
+        auth?.SignOut();
 
-            // CLOSE PROFILE PANEL if it is open
-            ProfileManager pm = FindObjectOfType<ProfileManager>();
-            if (pm != null && pm.panelRoot != null)
+        var pm = FindObjectOfType<ProfileManager>();
+        if (pm?.panelRoot != null) pm.panelRoot.SetActive(false);
+
+        UIManager.Instance?.OpenHomePanel();
+    }
+
+    // ------------------------------------------------------
+    // ------------------- RESET PASSWORD -------------------
+    // ------------------------------------------------------
+
+    public void SendPasswordReset()
+    {
+        // Always use best option: OpenResetPasswordPanelFromLogin()
+        if (UIManager.Instance != null &&
+            UIManager.Instance.resetPasswordPanel != null)
+        {
+            UIManager.Instance.OpenResetPasswordPanelFromLogin();
+
+            // Prefill with login email
+            if (UIManager.Instance.resetEmailField != null &&
+                emailLoginField != null)
             {
-                pm.panelRoot.SetActive(false);
+                UIManager.Instance.resetEmailField.text =
+                    emailLoginField.text.Trim();
             }
 
-            // RETURN TO HOME SCREEN
-            if (UIManager.Instance != null)
-                UIManager.Instance.OpenHomePanel();
+            return;
         }
     }
 
-
-    // Optional: reset password
-    public void SendPasswordReset()
+    // Called by Reset Panel Submit Button
+    public void SubmitPasswordResetFromPanel()
     {
-        string email = emailLoginField != null ? emailLoginField.text.Trim() : string.Empty;
+        string email = UIManager.Instance.resetEmailField.text.Trim();
+
         if (string.IsNullOrEmpty(email))
         {
-            StartCoroutine(ShowError(loginErrorText, "Enter email to reset password"));
+            UIManager.Instance.resetStatusText.text = "Enter your email.";
             return;
         }
 
         if (!IsValidEmail(email))
         {
-            StartCoroutine(ShowError(loginErrorText, "Email format invalid"));
+            UIManager.Instance.resetStatusText.text = "Invalid email format.";
             return;
         }
 
-        StartCoroutine(SendPasswordResetAsync(email));
+        StartCoroutine(ResetAsync(email));
     }
 
-    private IEnumerator SendPasswordResetAsync(string email)
+    private IEnumerator ResetAsync(string email)
     {
-        SetButtonsInteractable(false);
-        if (loginStatusText) { loginStatusText.text = "Sending reset link..."; loginStatusText.gameObject.SetActive(true); }
+        UIManager.Instance.resetStatusText.text = "Sending reset link...";
+        UIManager.Instance.resetSubmitButton.interactable = false;
 
-        var resetTask = auth.SendPasswordResetEmailAsync(email);
-        yield return new WaitUntil(() => resetTask.IsCompleted);
+        var task = auth.SendPasswordResetEmailAsync(email);
+        yield return new WaitUntil(() => task.IsCompleted);
 
-        SetButtonsInteractable(true);
-        if (loginStatusText) loginStatusText.gameObject.SetActive(false);
-
-        if (resetTask.Exception != null)
+        if (task.Exception != null)
         {
-            StartCoroutine(ShowError(loginErrorText, "Failed to send reset email"));
-        }
-        else
-        {
-            StartCoroutine(ShowError(loginErrorText, "Reset email sent (check inbox).", 4f));
-        }
-    }
-
-    private IEnumerator ShowError(TMP_Text errorText, string message, float duration = 3f)
-    {
-        if (errorText == null)
-        {
-            Debug.LogWarning("ShowError called but errorText is null. Message: " + message);
+            UIManager.Instance.resetStatusText.text = "Failed to send reset email.";
+            UIManager.Instance.resetSubmitButton.interactable = true;
             yield break;
         }
 
-        errorText.text = message;
-        errorText.gameObject.SetActive(true);
+        UIManager.Instance.resetStatusText.text =
+            "If an account exists, a reset link was sent.";
 
-        yield return new WaitForSeconds(duration);
+        yield return new WaitForSeconds(2f);
 
-        if (errorText != null)
-            errorText.gameObject.SetActive(false);
+        UIManager.Instance.CloseResetPasswordPanel();
+
+        StartCoroutine(ResetCooldown());
     }
 
-    private void SetButtonsInteractable(bool interactable)
+    private IEnumerator ResetCooldown()
     {
-        if (loginButton) loginButton.interactable = interactable;
-        if (registerButton) registerButton.interactable = interactable;
+        Button btn = UIManager.Instance.resetSubmitButton;
+        btn.interactable = false;
+
+        float t = 0;
+        while (t < resetCooldownSeconds)
+        {
+            t += Time.deltaTime;
+            yield return null;
+        }
+
+        btn.interactable = true;
     }
 
-    // Basic email regex validation (reasonable, not exhaustive)
+    // ------------------------------------------------------
+    // Utility
+    // ------------------------------------------------------
+
+    private IEnumerator ShowError(TMP_Text t, string msg, float dur = 3f)
+    {
+        if (t == null) yield break;
+        t.text = msg;
+        t.gameObject.SetActive(true);
+        yield return new WaitForSeconds(dur);
+        t.gameObject.SetActive(false);
+    }
+
+    private void SetButtonsInteractable(bool state)
+    {
+        if (loginButton) loginButton.interactable = state;
+        if (registerButton) registerButton.interactable = state;
+    }
+
     private bool IsValidEmail(string email)
     {
-        if (string.IsNullOrEmpty(email)) return false;
-        // Simple RFC-ish check (good enough for local validation)
-        const string pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
-        return Regex.IsMatch(email, pattern);
+        return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
     }
 }
