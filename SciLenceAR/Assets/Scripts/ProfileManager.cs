@@ -1,5 +1,5 @@
 // File: Assets/Scripts/UI/ProfileManager.cs
-// Debug-friendly ProfileManager: loads/saves profile and prints detailed logs.
+// ProfileManager: automatically refreshes on auth state changes and when the panel is opened.
 
 using System;
 using System.Collections.Generic;
@@ -11,10 +11,10 @@ using UnityEngine.UI;
 
 public class ProfileManager : MonoBehaviour
 {
-    public InputField nameInput; // legacy InputField; if using TMP, change type to TMP_InputField
+    public InputField nameInput; // change to TMP_InputField if you use TextMeshPro
     public Text emailText;
     public Text summaryText;
-    public GameObject panelRoot; // optional: assign ProfilePanel so we can Close it
+    public GameObject panelRoot; // assign the ProfilePanel here in Inspector
 
     FirebaseAuth auth;
     FirebaseFirestore db;
@@ -37,8 +37,49 @@ public class ProfileManager : MonoBehaviour
 
     void OnEnable()
     {
-        Debug.Log("[ProfileManager] OnEnable called - attempting LoadProfile()");
-        _ = LoadProfile(); // fire-and-forget async - logs inside
+        Debug.Log("[ProfileManager] OnEnable called - subscribing to auth state and loading profile (if any).");
+        if (auth != null)
+            auth.StateChanged += OnAuthStateChanged;
+
+        // Always attempt to load (if user is already signed in this will populate UI).
+        _ = LoadProfile();
+    }
+
+    void OnDisable()
+    {
+        Debug.Log("[ProfileManager] OnDisable - unsubscribing auth state.");
+        if (auth != null)
+            auth.StateChanged -= OnAuthStateChanged;
+    }
+
+    void OnDestroy()
+    {
+        if (auth != null)
+            auth.StateChanged -= OnAuthStateChanged;
+    }
+
+    // Called when Firebase auth changes
+    private void OnAuthStateChanged(object sender, System.EventArgs e)
+    {
+        Debug.Log("[ProfileManager] Auth state changed. CurrentUser: " + (auth.CurrentUser != null ? auth.CurrentUser.UserId : "null"));
+        // When a user signs in, reload profile.
+        if (auth.CurrentUser != null)
+        {
+            _ = LoadProfile();
+        }
+        else
+        {
+            // Signed out -> update UI
+            if (emailText != null) emailText.text = "Not signed in";
+            if (summaryText != null) summaryText.text = "Not signed in";
+            if (nameInput != null) nameInput.text = "";
+        }
+    }
+
+    // Public helper that UIManager or other scripts can call to force a refresh.
+    public void RefreshProfile()
+    {
+        _ = LoadProfile();
     }
 
     // Public method to load or create profile
@@ -46,11 +87,21 @@ public class ProfileManager : MonoBehaviour
     {
         Debug.Log("[ProfileManager] LoadProfile() start.");
 
+        if (auth == null)
+        {
+            Debug.LogWarning("[ProfileManager] FirebaseAuth instance is null.");
+            if (emailText != null) emailText.text = "Not signed in";
+            if (summaryText != null) summaryText.text = "Not signed in";
+            return;
+        }
+
         var user = auth.CurrentUser;
         if (user == null)
         {
             Debug.LogWarning("[ProfileManager] No authenticated user found. CurrentUser is null.");
             if (emailText != null) emailText.text = "Not signed in";
+            if (summaryText != null) summaryText.text = "Not signed in";
+            if (nameInput != null) nameInput.text = "";
             return;
         }
 
@@ -80,7 +131,7 @@ public class ProfileManager : MonoBehaviour
                 await docRef.SetAsync(initial);
                 // reflect in UI
                 if (nameInput != null) nameInput.text = initial["name"] as string;
-                UpdateSummaryTextFromProgressCounts(); // async inside
+                await UpdateSummaryTextFromProgressCounts();
                 Debug.Log("[ProfileManager] Created profile doc for user.");
                 return;
             }
@@ -99,7 +150,7 @@ public class ProfileManager : MonoBehaviour
                 if (nameInput != null) nameInput.text = "";
             }
 
-            // optionally show email saved
+            // optionally show email saved in doc (but prefer auth email)
             if (snap.ContainsField("email"))
             {
                 string storedEmail = snap.GetValue<string>("email");
@@ -112,6 +163,7 @@ public class ProfileManager : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError("[ProfileManager] Error while loading profile: " + ex);
+            if (summaryText != null) summaryText.text = "Error loading profile";
         }
     }
 

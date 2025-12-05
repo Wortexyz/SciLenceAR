@@ -1,5 +1,5 @@
 ﻿// File: Assets/Scripts/UI/UIManager.cs
-// Updated UIManager for SciLenceAR - adds Instance alias for compatibility.
+// Updated UIManager for SciLenceAR - adds Instance alias for compatibility and a real HomePanel.
 
 using System.IO;
 using System.Threading.Tasks;
@@ -11,14 +11,20 @@ using UnityEngine.Networking;
 public class UIManager : MonoBehaviour
 {
     public static UIManager I;
-    // Compatibility alias used by some other scripts in the project.
+    // Compatibility alias used by other scripts in the project.
     public static UIManager Instance => I;
+
+    [Header("Auth Panels")]
+    public GameObject homePanel;     // LOGIN / SIGNUP panel (new)
+    public GameObject loginPanel;    // optional child panel
+    public GameObject registerPanel; // optional child panel
 
     [Header("Panels (General)")]
     public GameObject subjectPanel;
     public GameObject physicsPanel;
     public GameObject chemistryPanel;
     public GameObject biologyPanel;
+    public GameObject ProfilePannel;
 
     [Header("Video UI")]
     public GameObject videoModal;       // panel which contains the Video UI
@@ -48,6 +54,13 @@ public class UIManager : MonoBehaviour
         if (videoModal) videoModal.SetActive(false);
         if (notesModal) notesModal.SetActive(false);
         if (arRunningPanel) arRunningPanel.SetActive(false);
+
+        // hide auth & subject panels by default — FirebaseAuthManager will request the correct panel
+        if (homePanel) homePanel.SetActive(false);
+        if (subjectPanel) subjectPanel.SetActive(false);
+        if (physicsPanel) physicsPanel.SetActive(false);
+        if (chemistryPanel) chemistryPanel.SetActive(false);
+        if (biologyPanel) biologyPanel.SetActive(false);
 
         // wire close button (safety: only if assigned)
         if (videoCloseButton != null) videoCloseButton.onClick.AddListener(CloseVideo);
@@ -370,27 +383,65 @@ public class UIManager : MonoBehaviour
     #endregion
 
     // Compatibility methods: some other scripts call these names.
-public void OpenHomePanel()
-{
-    // same as going back to the subject list/home
-    BackToSubjectList();
-}
+    public void OpenHomePanel()
+    {
+        // Show the auth home screen and hide subject/modals
+        if (homePanel) homePanel.SetActive(true);
 
-// Open the subject-panel. Called from UI buttons or other scripts.
-// Two overloads provided: one without argument and one with subject name.
-public void OpenSubjectPanel()
-{
-    // Show the main subject panel (hide subject-specific content)
-    if (subjectPanel) subjectPanel.SetActive(true);
-    if (physicsPanel) physicsPanel.SetActive(false);
-    if (chemistryPanel) chemistryPanel.SetActive(false);
-    if (biologyPanel) biologyPanel.SetActive(false);
-}
+        // Hide subject UI
+        if (subjectPanel) subjectPanel.SetActive(false);
+        if (physicsPanel) physicsPanel.SetActive(false);
+        if (chemistryPanel) chemistryPanel.SetActive(false);
+        if (biologyPanel) biologyPanel.SetActive(false);
 
-public void OpenSubjectPanel(string subject)
-{
-    // forward to existing helper
-    ShowSubjectPanel(subject);
-}
+        // Hide modals
+        if (videoModal) videoModal.SetActive(false);
+        if (notesModal) notesModal.SetActive(false);
+    }
 
+    // Open the subject-panel. Called from UI buttons or other scripts.
+    // Two overloads provided: one without argument and one with subject name.
+    public void OpenSubjectPanel()
+    {
+        // Show the main subject panel (hide subject-specific content)
+        if (subjectPanel) subjectPanel.SetActive(true);
+        if (physicsPanel) physicsPanel.SetActive(false);
+        if (chemistryPanel) chemistryPanel.SetActive(false);
+        if (biologyPanel) biologyPanel.SetActive(false);
+
+        // Ensure auth home is hidden when subject is shown
+        if (homePanel) homePanel.SetActive(false);
+    }
+
+    public void OpenSubjectPanel(string subject)
+    {
+        // forward to existing helper
+        ShowSubjectPanel(subject);
+        // ensure home is hidden
+        if (homePanel) homePanel.SetActive(false);
+    }
+   
+       public void OpenProfilePannel()
+    {
+        if (ProfilePannel != null) ProfilePannel.SetActive(true);
+        if (subjectPanel != null) subjectPanel.SetActive(false);
+
+        // Force profile refresh if ProfileManager exists
+        var pm = FindObjectOfType<ProfileManager>();
+        if (pm != null)
+        {
+            pm.RefreshProfile(); // calls LoadProfile() asynchronously
+        }
+        else
+        {
+            Debug.LogWarning("[UIManager] OpenProfilePannel called but ProfileManager not found in scene.");
+        }
+    }
+
+
+public void closeProfilePannel()
+    {
+        ProfilePannel.SetActive(false);
+        subjectPanel.SetActive(true);
+    }
 }
