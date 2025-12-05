@@ -1,10 +1,13 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using Firebase;
 using Firebase.Auth;
+using Firebase.Firestore;
+using Firebase.Extensions;
 using UnityEngine.SceneManagement;
 
 public class FirebaseAuthManager : MonoBehaviour
@@ -13,6 +16,7 @@ public class FirebaseAuthManager : MonoBehaviour
     public DependencyStatus dependencyStatus;
     public FirebaseAuth auth;
     public FirebaseUser user;
+    private FirebaseFirestore db;
 
     [Space]
     [Header("Login")]
@@ -78,6 +82,7 @@ public class FirebaseAuthManager : MonoBehaviour
     void InitializeFirebase()
     {
         auth = FirebaseAuth.DefaultInstance;
+        db = FirebaseFirestore.DefaultInstance;
 
         auth.StateChanged -= AuthStateChanged;
         auth.StateChanged += AuthStateChanged;
@@ -307,11 +312,32 @@ public class FirebaseAuthManager : MonoBehaviour
 
         user = task.Result.User;
 
-        // Set display name
-        var profileTask = user.UpdateUserProfileAsync(
-            new UserProfile { DisplayName = name }
-        );
+        // Set display name on Firebase user
+        var profileTask = user.UpdateUserProfileAsync(new UserProfile { DisplayName = name });
         yield return new WaitUntil(() => profileTask.IsCompleted);
+
+        // Create user document in Firestore with name and email (so profile shows immediately)
+        if (db != null)
+        {
+            var docRef = db.Collection("users").Document(user.UserId);
+            var initial = new Dictionary<string, object>
+            {
+                { "name", name ?? "" },
+                { "email", email ?? "" },
+                { "createdAt", Timestamp.GetCurrentTimestamp() }
+            };
+
+            var setTask = docRef.SetAsync(initial);
+            yield return new WaitUntil(() => setTask.IsCompleted);
+            if (setTask.Exception != null)
+            {
+                Debug.LogWarning("[FirebaseAuthManager] Failed to create user doc: " + setTask.Exception);
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[FirebaseAuthManager] Firestore db is null - skipping user doc create.");
+        }
 
         GoToSubject();
     }
@@ -332,13 +358,13 @@ public class FirebaseAuthManager : MonoBehaviour
 
     public void SendPasswordReset()
     {
-        // Always use best option: OpenResetPasswordPanelFromLogin()
+        // Open panel for reset
         if (UIManager.Instance != null &&
             UIManager.Instance.resetPasswordPanel != null)
         {
             UIManager.Instance.OpenResetPasswordPanelFromLogin();
 
-            // Prefill with login email
+            // Prefill with login email field (if available)
             if (UIManager.Instance.resetEmailField != null &&
                 emailLoginField != null)
             {
@@ -367,6 +393,20 @@ public class FirebaseAuthManager : MonoBehaviour
             return;
         }
 
+        // NEW: Require user to be signed in and entered email must match signed-in email
+        if (auth == null || auth.CurrentUser == null)
+        {
+            UIManager.Instance.resetStatusText.text = "You must be signed in to reset password from the app.";
+            return;
+        }
+
+        string signedInEmail = auth.CurrentUser.Email ?? "";
+        if (!string.Equals(email, signedInEmail, System.StringComparison.OrdinalIgnoreCase))
+        {
+            UIManager.Instance.resetStatusText.text = "Enter the email address used to sign in.";
+            return;
+        }
+
         StartCoroutine(ResetAsync(email));
     }
 
@@ -386,7 +426,7 @@ public class FirebaseAuthManager : MonoBehaviour
         }
 
         UIManager.Instance.resetStatusText.text =
-            "If an account exists, a reset link was sent.";
+            "Reset link sent. Check your inbox.";
 
         yield return new WaitForSeconds(2f);
 
@@ -397,6 +437,7 @@ public class FirebaseAuthManager : MonoBehaviour
 
     private IEnumerator ResetCooldown()
     {
+        if (UIManager.Instance == null || UIManager.Instance.resetSubmitButton == null) yield break;
         Button btn = UIManager.Instance.resetSubmitButton;
         btn.interactable = false;
 

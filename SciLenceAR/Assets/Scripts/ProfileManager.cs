@@ -1,6 +1,3 @@
-// File: Assets/Scripts/UI/ProfileManager.cs
-// ProfileManager: automatically refreshes on auth state changes and when the panel is opened.
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -58,31 +55,26 @@ public class ProfileManager : MonoBehaviour
             auth.StateChanged -= OnAuthStateChanged;
     }
 
-    // Called when Firebase auth changes
     private void OnAuthStateChanged(object sender, System.EventArgs e)
     {
         Debug.Log("[ProfileManager] Auth state changed. CurrentUser: " + (auth.CurrentUser != null ? auth.CurrentUser.UserId : "null"));
-        // When a user signs in, reload profile.
         if (auth.CurrentUser != null)
         {
             _ = LoadProfile();
         }
         else
         {
-            // Signed out -> update UI
             if (emailText != null) emailText.text = "Not signed in";
             if (summaryText != null) summaryText.text = "Not signed in";
             if (nameInput != null) nameInput.text = "";
         }
     }
 
-    // Public helper that UIManager or other scripts can call to force a refresh.
     public void RefreshProfile()
     {
         _ = LoadProfile();
     }
 
-    // Public method to load or create profile
     public async Task LoadProfile()
     {
         Debug.Log("[ProfileManager] LoadProfile() start.");
@@ -111,6 +103,8 @@ public class ProfileManager : MonoBehaviour
         if (db == null)
         {
             Debug.LogError("[ProfileManager] Firestore not initialized. Cannot load profile.");
+            // Still populate name from auth displayName if available
+            if (nameInput != null) nameInput.text = user.DisplayName ?? "";
             return;
         }
 
@@ -124,12 +118,11 @@ public class ProfileManager : MonoBehaviour
                 Debug.Log("[ProfileManager] No profile doc found - creating default profile doc.");
                 var initial = new Dictionary<string, object>
                 {
-                    {"name", user.DisplayName ?? ""},
-                    {"email", user.Email ?? ""},
+                    {"name", user.DisplayName ?? "" },
+                    {"email", user.Email ?? "" },
                     {"createdAt", Timestamp.GetCurrentTimestamp()}
                 };
                 await docRef.SetAsync(initial);
-                // reflect in UI
                 if (nameInput != null) nameInput.text = initial["name"] as string;
                 await UpdateSummaryTextFromProgressCounts();
                 Debug.Log("[ProfileManager] Created profile doc for user.");
@@ -146,18 +139,17 @@ public class ProfileManager : MonoBehaviour
             }
             else
             {
-                Debug.Log("[ProfileManager] 'name' field not found in profile doc.");
-                if (nameInput != null) nameInput.text = "";
+                // fallback to auth displayName
+                if (nameInput != null) nameInput.text = user.DisplayName ?? "";
+                Debug.Log("[ProfileManager] 'name' field not found in profile doc. Used auth.DisplayName fallback.");
             }
 
-            // optionally show email saved in doc (but prefer auth email)
             if (snap.ContainsField("email"))
             {
                 string storedEmail = snap.GetValue<string>("email");
                 Debug.Log("[ProfileManager] Stored email in doc: " + storedEmail);
             }
 
-            // load progress counts summary
             await UpdateSummaryTextFromProgressCounts();
         }
         catch (Exception ex)
@@ -204,7 +196,7 @@ public class ProfileManager : MonoBehaviour
         }
     }
 
-    // Save name to Firestore
+    // Save name to Firestore and update FirebaseAuth displayName
     public async void SaveProfile()
     {
         Debug.Log("[ProfileManager] SaveProfile() invoked.");
@@ -222,6 +214,19 @@ public class ProfileManager : MonoBehaviour
         }
 
         string newName = nameInput != null ? nameInput.text : "";
+
+        // Update FirebaseAuth displayName
+        try
+        {
+            var updateProfileTask = user.UpdateUserProfileAsync(new Firebase.Auth.UserProfile { DisplayName = newName });
+            await updateProfileTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[ProfileManager] Failed to update Firebase displayName: " + ex);
+        }
+
+        // Update Firestore doc (merge)
         var docRef = db.Collection("users").Document(user.UserId);
         var updates = new Dictionary<string, object> { { "name", newName }, { "updatedAt", Timestamp.GetCurrentTimestamp() } };
 
@@ -235,7 +240,6 @@ public class ProfileManager : MonoBehaviour
             Debug.LogError("[ProfileManager] Failed saving profile: " + ex);
         }
 
-        // refresh summary or UI if you want
         await UpdateSummaryTextFromProgressCounts();
     }
 
