@@ -49,7 +49,6 @@ public class UIManager : MonoBehaviour
     [Header("AR/Other")]
     public GameObject arRunningPanel;
 
-    private ContentDefinition currentDef;
     private UserProgress _pendingProgress = null;
 
     void Awake()
@@ -65,8 +64,7 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        if (videoModal) videoModal.SetActive(false);
-        if (notesModal) notesModal.SetActive(false);
+      
         if (arRunningPanel) arRunningPanel.SetActive(false);
 
         if (homePanel) homePanel.SetActive(false);
@@ -77,8 +75,7 @@ public class UIManager : MonoBehaviour
 
         if (resetPasswordPanel) resetPasswordPanel.SetActive(false);
 
-        if (videoCloseButton != null)
-            videoCloseButton.onClick.AddListener(CloseVideo);
+       
     }
 
     // -------------------------------------------------------
@@ -193,41 +190,9 @@ public class UIManager : MonoBehaviour
     // VIDEO / NOTES / AR (unchanged)
     // -------------------------------------------------------
 
-    public async void OnWatchClicked(ContentDefinition def)
-    {
-        if (def == null) return;
+    
 
-        currentDef = def;
-
-        if (videoTitleText != null)
-            videoTitleText.text = def.title ?? "Video";
-
-        if (def.videoSource == VideoSourceType.DirectMp4)
-        {
-            await PlayDirectVideoWithCache(def);
-        }
-        else if (def.videoSource == VideoSourceType.YouTube)
-        {
-            string url = def.videoUrlOrYouTubeId;
-            if (!url.StartsWith("http"))
-                url = "https://www.youtube.com/watch?v=" + url;
-
-            Application.OpenURL(url);
-        }
-    }
-
-    async Task PlayDirectVideoWithCache(ContentDefinition def)
-    {
-        string url = def.videoUrlOrYouTubeId;
-        string safeFileName = $"{def.contentId}.mp4";
-        string localPath = Path.Combine(Application.persistentDataPath, safeFileName);
-
-        if (!File.Exists(localPath))
-            await DownloadFileAsync(url, localPath);
-
-        string fileUrl = "file://" + localPath;
-        await PlayVideoFromUrl(fileUrl, def);
-    }
+    
 
     async Task<bool> DownloadFileAsync(string url, string localPath)
     {
@@ -250,30 +215,7 @@ public class UIManager : MonoBehaviour
         return false;
     }
 
-    async Task PlayVideoFromUrl(string url, ContentDefinition def)
-    {
-        if (!videoPlayer) return;
+    
 
-        videoPlayer.url = url;
-        if (videoModal) videoModal.SetActive(true);
-
-        videoPlayer.prepareCompleted -= OnVideoPrepared;
-        videoPlayer.prepareCompleted += OnVideoPrepared;
-
-        videoPlayer.Prepare();
-    }
-
-    void OnVideoPrepared(VideoPlayer vp)
-    {
-        vp.Play();
-    }
-
-    public void CloseVideo()
-    {
-        if (videoPlayer && videoPlayer.isPlaying)
-            videoPlayer.Pause();
-
-        if (videoModal)
-            videoModal.SetActive(false);
-    }
+  
 }

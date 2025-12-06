@@ -65,8 +65,12 @@ public class SubjectManager : MonoBehaviour
     }
 
     // Call this from any subject panel's Back button to return to the subject selection panel.
+    public VideoController videoController; // assign VideoPlayerGO
+
     public void BackToSubjectPanel()
     {
+        videoController.StopVideo();   
         OpenSubjectPanel();
     }
+
 }
