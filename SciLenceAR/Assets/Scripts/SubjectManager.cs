@@ -63,13 +63,10 @@ public class SubjectManager : MonoBehaviour
         HideAll();
         if (biologyPanel) biologyPanel.SetActive(true);
     }
-
-    // Call this from any subject panel's Back button to return to the subject selection panel.
-    public VideoController videoController; // assign VideoPlayerGO
+    
 
     public void BackToSubjectPanel()
-    {
-        videoController.StopVideo();   
+    {   
         OpenSubjectPanel();
     }
 
