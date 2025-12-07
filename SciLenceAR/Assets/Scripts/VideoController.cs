@@ -5,12 +5,12 @@ using UnityEngine.Video;
 public class VideoController : MonoBehaviour
 {
     public VideoPlayer videoPlayer;
+    public AudioSource audioSource;
 
     [HideInInspector] public RawImage displayRawImage;
     [HideInInspector] public Slider seekSlider;
     [HideInInspector] public Button playPauseButton;
 
-    private bool isDragging = false;
     private bool isPrepared = false;
     private bool listenersAssigned = false;
 
@@ -19,15 +19,26 @@ public class VideoController : MonoBehaviour
         if (videoPlayer == null)
             videoPlayer = GetComponent<VideoPlayer>();
 
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+
         videoPlayer.source = VideoSource.VideoClip;
+        videoPlayer.playOnAwake = false;
+        videoPlayer.waitForFirstFrame = false;
+
+        videoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
+        videoPlayer.controlledAudioTrackCount = 1;
+        videoPlayer.EnableAudioTrack(0, true);
+        videoPlayer.SetTargetAudioSource(0, audioSource);
     }
 
     void Update()
     {
-        if (isPrepared && videoPlayer.isPlaying && !isDragging && videoPlayer.clip != null)
-        {
-            seekSlider.value = (float)(videoPlayer.time / videoPlayer.length);
-        }
+        if (!isPrepared || videoPlayer.length <= 0)
+            return;
+
+        if (seekSlider != null)
+            seekSlider.SetValueWithoutNotify((float)(videoPlayer.time / videoPlayer.length));
     }
 
     public void LoadAndPlay(VideoClip clip)
@@ -40,7 +51,7 @@ public class VideoController : MonoBehaviour
 
         if (clip == null)
         {
-            Debug.LogWarning("VideoController: No clip assigned");
+            Debug.LogError("VideoController: VideoClip is NULL");
             return;
         }
 
@@ -51,14 +62,23 @@ public class VideoController : MonoBehaviour
 
         videoPlayer.prepareCompleted -= OnPrepared;
         videoPlayer.prepareCompleted += OnPrepared;
+        videoPlayer.errorReceived -= OnError;
+        videoPlayer.errorReceived += OnError;
 
         videoPlayer.Prepare();
     }
 
     void AssignListeners()
     {
-        playPauseButton.onClick.AddListener(TogglePlayPause);
-        seekSlider.onValueChanged.AddListener(OnSliderChanged);
+        if (playPauseButton != null)
+            playPauseButton.onClick.AddListener(TogglePlayPause);
+
+        if (seekSlider != null)
+        {
+            seekSlider.minValue = 0f;
+            seekSlider.maxValue = 1f;
+            seekSlider.onValueChanged.AddListener(Seek);
+        }
     }
 
     void OnPrepared(VideoPlayer vp)
@@ -67,9 +87,27 @@ public class VideoController : MonoBehaviour
         vp.Play();
     }
 
+    void Seek(float value)
+    {
+        if (!isPrepared || videoPlayer.length <= 0)
+            return;
+
+        double targetTime = value * videoPlayer.length;
+
+        if (videoPlayer.canSetTime)
+        {
+            videoPlayer.time = targetTime;
+        }
+        else
+        {
+            Debug.LogError("This video CANNOT SEEK. Re-encode the video.");
+        }
+    }
+
     void TogglePlayPause()
     {
-        if (!isPrepared) return;
+        if (!isPrepared)
+            return;
 
         if (videoPlayer.isPlaying)
             videoPlayer.Pause();
@@ -77,17 +115,14 @@ public class VideoController : MonoBehaviour
             videoPlayer.Play();
     }
 
-    void OnSliderChanged(float value)
+    void OnError(VideoPlayer vp, string msg)
     {
-        if (!isPrepared) return;
-
-        isDragging = true;
-        videoPlayer.time = value * videoPlayer.length;
-        isDragging = false;
+        Debug.LogError("VIDEO ERROR: " + msg);
     }
 
     public void StopVideo()
     {
-        videoPlayer.Stop();
+        if (videoPlayer != null)
+            videoPlayer.Stop();
     }
 }

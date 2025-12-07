@@ -16,21 +16,48 @@ public class ContentPanelController : MonoBehaviour
     [HideInInspector]
     public VideoController videoController;
 
+    public PDFDownloader pdfDownloader;
+
     public void Bind(VideoClip clip, string notes, string pdfUrl)
     {
-        notesText.text = notes;
+        // Assign notes
+        if (notesText != null)
+            notesText.text = notes;
 
+        // PDF button binding with per-topic filename
         pdfButton.onClick.RemoveAllListeners();
-        pdfButton.onClick.AddListener(() => Application.OpenURL(pdfUrl));
+        pdfButton.onClick.AddListener(() =>
+        {
+            if (pdfDownloader != null && !string.IsNullOrEmpty(pdfUrl) && clip != null)
+            {
+                string safeFileName = clip.name + ".pdf";
+                pdfDownloader.DownloadPDF(pdfUrl, safeFileName);
+            }
+            else
+            {
+                Debug.LogError("PDFDownloader, PDF URL, or VideoClip is missing");
+            }
+        });
 
+        // AR button placeholder
         arButton.onClick.RemoveAllListeners();
-        arButton.onClick.AddListener(() => Debug.Log("AR Button pressed"));
+        arButton.onClick.AddListener(() =>
+        {
+            Debug.Log("AR Button Pressed");
+        });
 
-        videoController.displayRawImage = rawImage;
-        videoController.seekSlider = seekSlider;
-        videoController.playPauseButton = playPauseButton;
+        // Connect UI to VideoController
+        if (videoController != null)
+        {
+            videoController.displayRawImage = rawImage;
+            videoController.seekSlider = seekSlider;
+            videoController.playPauseButton = playPauseButton;
 
-        videoController.LoadAndPlay(clip);
+            videoController.LoadAndPlay(clip);
+        }
+        else
+        {
+            Debug.LogError("VideoController is NULL in ContentPanelController");
+        }
     }
-
 }
