@@ -10,6 +10,10 @@ public class ChemistryLevelManager : MonoBehaviour
     public GameObject StateMatterPanel;
     public GameObject ChemicalReactionPanel;
 
+    public VideoController MolecularVideoController;
+    public VideoController StateMatterVideoController;
+    public VideoController ChemicalReactionVideoController;
+
     private void Awake()
     {
         // Simple singleton (keeps the first instance, destroys duplicates)
@@ -27,7 +31,7 @@ public class ChemistryLevelManager : MonoBehaviour
     private void Start()
     {
         // Start by showing the subject selection panel by default
-        OpenChemistryPanel();
+        
     }
 
     private void HideAll()
@@ -67,6 +71,9 @@ public class ChemistryLevelManager : MonoBehaviour
     // Call this from any subject panel's Back button to return to the subject selection panel.
     public void BackToChemistryPanel()
     {
+        if (MolecularVideoController) MolecularVideoController.StopVideo();
+        if (StateMatterVideoController) StateMatterVideoController.StopVideo();
+        if (ChemicalReactionVideoController) ChemicalReactionVideoController.StopVideo();
         OpenChemistryPanel();
-    }
+    }
 }

@@ -10,6 +10,10 @@ public class BiologyLevelManager : MonoBehaviour
     public GameObject CellStructurePanel;
     public GameObject PhotosynthesisPanel;
 
+    public VideoController HumanHeartVideoController;
+    public VideoController CellStructureVideoController;
+    public VideoController PhotosynthesisVideoController;
+
     private void Awake()
     {
         // Simple singleton (keeps the first instance, destroys duplicates)
@@ -27,7 +31,7 @@ public class BiologyLevelManager : MonoBehaviour
     private void Start()
     {
         // Start by showing the subject selection panel by default
-        OpenBiologyPanel();
+        
     }
 
     private void HideAll()
@@ -67,6 +71,9 @@ public class BiologyLevelManager : MonoBehaviour
     // Call this from any subject panel's Back button to return to the subject selection panel.
     public void BackToBiologyPanel()
     {
+        if (HumanHeartVideoController) HumanHeartVideoController.StopVideo();
+        if (CellStructureVideoController) CellStructureVideoController.StopVideo();
+        if (PhotosynthesisVideoController) PhotosynthesisVideoController.StopVideo();
         OpenBiologyPanel();
-    }
+    }
 }

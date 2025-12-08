@@ -12,7 +12,6 @@ public class VideoController : MonoBehaviour
     [HideInInspector] public Button playPauseButton;
 
     private bool isPrepared = false;
-    private bool listenersAssigned = false;
 
     void Awake()
     {
@@ -43,11 +42,8 @@ public class VideoController : MonoBehaviour
 
     public void LoadAndPlay(VideoClip clip)
     {
-        if (!listenersAssigned)
-        {
-            AssignListeners();
-            listenersAssigned = true;
-        }
+        // Always bind listeners to the CURRENT panel’s UI
+        AssignListeners();
 
         if (clip == null)
         {
@@ -70,14 +66,26 @@ public class VideoController : MonoBehaviour
 
     void AssignListeners()
     {
+        // Clean old listeners on current UI elements so we don't stack duplicates
         if (playPauseButton != null)
+        {
+            playPauseButton.onClick.RemoveAllListeners();
             playPauseButton.onClick.AddListener(TogglePlayPause);
+        }
 
         if (seekSlider != null)
         {
+            seekSlider.onValueChanged.RemoveAllListeners();
             seekSlider.minValue = 0f;
             seekSlider.maxValue = 1f;
+            seekSlider.wholeNumbers = false;
             seekSlider.onValueChanged.AddListener(Seek);
+        }
+
+        // Optional: bind the video texture to the RawImage
+        if (displayRawImage != null)
+        {
+            displayRawImage.texture = videoPlayer.targetTexture;
         }
     }
 
@@ -124,5 +132,5 @@ public class VideoController : MonoBehaviour
     {
         if (videoPlayer != null)
             videoPlayer.Stop();
-    }
+    }
 }

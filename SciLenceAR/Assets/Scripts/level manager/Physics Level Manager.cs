@@ -5,14 +5,18 @@ public class PhysicsLevelManager : MonoBehaviour
     public static PhysicsLevelManager Instance;
 
     [Header("Panels")]
-    public GameObject PhysicsPanel;    // The main subject selection panel (physics/chemistry/biology buttons)
+    public GameObject PhysicsPanel;
     public GameObject NewtonLawPanel;
     public GameObject GravityPanel;
     public GameObject ElectricCircuitPanel;
 
+    [Header("Video Controllers")]
+    public VideoController newtonVideoController;
+    public VideoController gravityVideoController;
+    public VideoController electricCircuitVideoController;
+
     private void Awake()
     {
-        // Simple singleton (keeps the first instance, destroys duplicates)
         if (Instance == null)
         {
             Instance = this;
@@ -26,8 +30,7 @@ public class PhysicsLevelManager : MonoBehaviour
 
     private void Start()
     {
-        // Start by showing the subject selection panel by default
-        OpenPhysicsPanel();
+        
     }
 
     private void HideAll()
@@ -38,14 +41,12 @@ public class PhysicsLevelManager : MonoBehaviour
         if (ElectricCircuitPanel) ElectricCircuitPanel.SetActive(false);
     }
 
-    // Opens the main subject selection panel
     public void OpenPhysicsPanel()
     {
         HideAll();
         if (PhysicsPanel) PhysicsPanel.SetActive(true);
     }
 
-    // Subject openers (can be used by the subject buttons)
     public void OpenNewtonsLaw()
     {
         HideAll();
@@ -64,9 +65,13 @@ public class PhysicsLevelManager : MonoBehaviour
         if (ElectricCircuitPanel) ElectricCircuitPanel.SetActive(true);
     }
 
-    // Call this from any subject panel's Back button to return to the subject selection panel.
     public void BackToPhysicsPanel()
     {
+        // stop all subject videos (safe even if some aren't playing)
+        if (newtonVideoController) newtonVideoController.StopVideo();
+        if (gravityVideoController) gravityVideoController.StopVideo();
+        if (electricCircuitVideoController) electricCircuitVideoController.StopVideo();
+
         OpenPhysicsPanel();
-    }
+    }
 }
