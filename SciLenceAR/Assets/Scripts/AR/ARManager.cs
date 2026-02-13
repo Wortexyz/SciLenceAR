@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class ARSceneTest : MonoBehaviour
+public class ARManager : MonoBehaviour
 {
     // Start is called before the first frame update
     void Start()
@@ -15,8 +15,9 @@ public class ARSceneTest : MonoBehaviour
     void Update()
     {
         
+ 
     }
-    public void LoadARScene()
+    public void ARTestnext()
     {
         SceneManager.LoadScene("ARScene");
     }
