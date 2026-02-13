@@ -16,6 +16,10 @@ using UnityEngine.SceneManagement;
 
 public class FirebaseAuthManager : MonoBehaviour
 {
+    [Header("UI Pannels")]
+    public GameObject signupPannel;
+    public GameObject LoginPannel;
+
     [Header("Firebase")]
     public DependencyStatus dependencyStatus;
     public FirebaseAuth auth;
@@ -544,5 +548,17 @@ public class FirebaseAuthManager : MonoBehaviour
     private bool IsOnline()
     {
         return Application.internetReachability != NetworkReachability.NotReachable;
+    }
+
+    public void CreateAccountButton()
+    {
+        signupPannel.SetActive(true);
+        LoginPannel.SetActive(false);
+    }
+
+    public void AlreadyHaveAccountButton()
+    {
+        signupPannel.SetActive(false);
+        LoginPannel.SetActive(true);
     }
 }
