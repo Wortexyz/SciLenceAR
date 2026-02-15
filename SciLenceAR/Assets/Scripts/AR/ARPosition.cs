@@ -5,25 +5,38 @@ using UnityEngine.XR.ARSubsystems;
 
 public class ARPosition : MonoBehaviour
 {
+    [Header("Placement")]
     public GameObject placementIndicator;
     public GameObject objectToSpawn;
 
     private GameObject spawnedObject;
-    private ARRaycastManager arRaycastManager;
+    private ARRaycastManager raycastManager;
+    private ARPlaneManager planeManager;
+
     private Pose placementPose;
-    private bool placementValid = false;
+    private bool placementValid;
+
+    static List<ARRaycastHit> hits = new List<ARRaycastHit>();
 
     void Start()
     {
-        arRaycastManager = FindObjectOfType<ARRaycastManager>();
+        raycastManager = FindObjectOfType<ARRaycastManager>();
+        planeManager = FindObjectOfType<ARPlaneManager>();
+
+        if (placementIndicator)
+            placementIndicator.SetActive(false);
     }
 
     void Update()
     {
+        if (spawnedObject != null) return;
+
         UpdatePlacementPose();
         UpdatePlacementIndicator();
 
-        if (placementValid && spawnedObject == null && Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+        if (placementValid &&
+            Input.touchCount > 0 &&
+            Input.GetTouch(0).phase == TouchPhase.Began)
         {
             PlaceObject();
         }
@@ -31,40 +44,55 @@ public class ARPosition : MonoBehaviour
 
     void UpdatePlacementPose()
     {
-        Vector3 screenCenter = Camera.main.ViewportToScreenPoint(new Vector3(0.5f, 0.5f));
+        Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
 
-        List<ARRaycastHit> hits = new List<ARRaycastHit>();
-        arRaycastManager.Raycast(screenCenter, hits, TrackableType.PlaneWithinPolygon);
-
+        raycastManager.Raycast(screenCenter, hits, TrackableType.PlaneWithinPolygon);
         placementValid = hits.Count > 0;
 
         if (placementValid)
         {
             placementPose = hits[0].pose;
 
-            // Align the indicator forward relative to camera, flat on ground
-            Vector3 forward = Camera.main.transform.forward;
-            forward.y = 0;
-            placementPose.rotation = Quaternion.LookRotation(forward);
+            Vector3 camForward = Camera.main.transform.forward;
+            camForward.y = 0;
+            placementPose.rotation = Quaternion.LookRotation(camForward);
         }
     }
 
     void UpdatePlacementIndicator()
     {
-        if (spawnedObject == null && placementValid)
-        {
-            placementIndicator.SetActive(true);
-            placementIndicator.transform.SetPositionAndRotation(placementPose.position, placementPose.rotation);
-        }
-        else
-        {
-            placementIndicator.SetActive(false);
-        }
+        if (!placementIndicator) return;
+
+        placementIndicator.SetActive(placementValid);
+
+        if (placementValid)
+            placementIndicator.transform.SetPositionAndRotation(
+                placementPose.position,
+                placementPose.rotation);
     }
 
     void PlaceObject()
     {
-        spawnedObject = Instantiate(objectToSpawn, placementPose.position, placementPose.rotation);
+        spawnedObject = Instantiate(
+            objectToSpawn,
+            placementPose.position,
+            placementPose.rotation);
+
         placementIndicator.SetActive(false);
+        HidePlaneMeshes();
+
+        FindObjectOfType<ARUIManager>()?.RegisterObject(spawnedObject);
+    }
+
+   
+    void HidePlaneMeshes()
+    {
+        if (planeManager == null) return;
+
+        foreach (ARPlane plane in planeManager.trackables)
+        {
+            var mr = plane.GetComponent<MeshRenderer>();
+            if (mr) mr.enabled = false;
+        }
     }
 }
