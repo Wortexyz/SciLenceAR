@@ -3,6 +3,8 @@ using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Collections;
 using System.IO;
+using NativeFilePickerNamespace;
+using NativeShareNamespace; // Namespace for the newly added Native Share plugin
 
 public class PDFDownloader : MonoBehaviour
 {
@@ -29,17 +31,15 @@ public class PDFDownloader : MonoBehaviour
         if (progressText != null)
             progressText.text = "Preparing download...";
 
-#if UNITY_ANDROID && !UNITY_EDITOR
-        string downloadPath = Path.Combine("/storage/emulated/0/Download", safeFileName);
-#else
-        string downloadPath = Path.Combine(Application.persistentDataPath, safeFileName);
-#endif
+        // Step 1: Always download to internal persistent path first
+        string tempPath = Path.Combine(Application.persistentDataPath, safeFileName);
 
         UnityWebRequest request = UnityWebRequest.Get(url);
         request.timeout = 60;
 
         var operation = request.SendWebRequest();
 
+        // Progress loop stays outside try-catch to avoid CS1626
         while (!operation.isDone)
         {
             if (progressText != null)
@@ -47,24 +47,60 @@ public class PDFDownloader : MonoBehaviour
                 float percent = Mathf.Clamp01(request.downloadProgress) * 100f;
                 progressText.text = $"Downloading... {percent:0}%";
             }
-            yield return null;
+            yield return null; 
         }
-
-        bool writeSuccess = false;
 
         if (request.result == UnityWebRequest.Result.Success)
         {
+            bool writeSuccess = false;
             try
             {
-                File.WriteAllBytes(downloadPath, request.downloadHandler.data);
+                File.WriteAllBytes(tempPath, request.downloadHandler.data);
                 writeSuccess = true;
-                Debug.Log("PDF saved to: " + downloadPath);
+                Debug.Log("PDF temporary save successful at: " + tempPath);
             }
             catch (IOException e)
             {
                 Debug.LogError("File write error: " + e.Message);
+                if (progressText != null) progressText.text = "Storage error.";
+            }
+
+            if (writeSuccess)
+            {
                 if (progressText != null)
-                    progressText.text = "Storage permission error.";
+                    progressText.text = "Select save folder...";
+
+                yield return new WaitForSeconds(0.5f);
+
+                // ACTION A: Native File Picker - User chooses permanent folder (e.g. Downloads)
+                NativeFilePicker.ExportFile(tempPath, (success) =>
+                {
+                    if (success)
+                    {
+                        Debug.Log("File saved successfully to public storage.");
+                        
+                        if (progressText != null)
+                            progressText.text = "Saved! Opening...";
+
+                        // ACTION B: Native Share - Trigger "Open With" app list immediately
+                        new NativeShare()
+                            .AddFile(tempPath)
+                            .SetTitle("Open PDF")
+                            .SetCallback((result, shareTarget) => 
+                            {
+                                // Clean up temp file after user interacts with the share sheet
+                                if (File.Exists(tempPath)) File.Delete(tempPath);
+                                if (downloadPanel != null) downloadPanel.SetActive(false);
+                            })
+                            .Share();
+                    }
+                    else
+                    {
+                        // User cancelled save, clean up temp file
+                        if (File.Exists(tempPath)) File.Delete(tempPath);
+                        if (downloadPanel != null) downloadPanel.SetActive(false);
+                    }
+                });
             }
         }
         else
@@ -72,21 +108,9 @@ public class PDFDownloader : MonoBehaviour
             Debug.LogError("PDF DOWNLOAD ERROR: " + request.error);
             if (progressText != null)
                 progressText.text = "Download failed.";
+            
+            yield return new WaitForSeconds(1.5f);
+            if (downloadPanel != null) downloadPanel.SetActive(false);
         }
-
-       
-        if (writeSuccess)
-        {
-            if (progressText != null)
-                progressText.text = "Download complete. Opening file...";
-
-            yield return new WaitForSeconds(0.7f);
-            Application.OpenURL(downloadPath);
-        }
-
-        yield return new WaitForSeconds(1.2f);
-
-        if (downloadPanel != null)
-            downloadPanel.SetActive(false);
     }
 }
