@@ -3421,17 +3421,17 @@ PrefabInstance:
     - target: {fileID: -6601043233671942095, guid: cd1099843cd96734484e54bc609d333c,
         type: 3}
       propertyPath: m_LocalScale.x
-      value: 7615.2847
+      value: 87431.67
       objectReference: {fileID: 0}
     - target: {fileID: -6601043233671942095, guid: cd1099843cd96734484e54bc609d333c,
         type: 3}
       propertyPath: m_LocalScale.y
-      value: 7615.2847
+      value: 87431.67
       objectReference: {fileID: 0}
     - target: {fileID: -6601043233671942095, guid: cd1099843cd96734484e54bc609d333c,
         type: 3}
       propertyPath: m_LocalScale.z
-      value: 7615.2847
+      value: 87431.67
       objectReference: {fileID: 0}
     - target: {fileID: -6601043233671942095, guid: cd1099843cd96734484e54bc609d333c,
         type: 3}
@@ -3483,6 +3483,11 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -6601043233671942095, guid: cd1099843cd96734484e54bc609d333c,
+        type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -3498,7 +3503,7 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -7981514964708312862, guid: cd1099843cd96734484e54bc609d333c,
         type: 3}
       insertIndex: -1
-      addedObject: {fileID: 26625885957699471}
+      addedObject: {fileID: 8145162560989145176}
   m_SourcePrefab: {fileID: 3150474306388093854, guid: cd1099843cd96734484e54bc609d333c,
     type: 3}
 --- !u!4 &1674756830239606505 stripped
@@ -3513,7 +3518,7 @@ GameObject:
     type: 3}
   m_PrefabInstance: {fileID: 3700142851106780888}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &26625885957699471
+--- !u!114 &8145162560989145176
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -3522,9 +3527,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 2477677146570690106}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a114d32306d577043b92bcff4ff71757, type: 3}
+  m_Script: {fileID: 11500000, guid: 607581f85f6236643b81b1e1134569ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentMode: 0
-  minScale: 0.3
-  maxScale: 2
+  minScale: 0.2
+  maxScale: 10
+  scaleSpeed: 0.005
