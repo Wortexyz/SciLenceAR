@@ -25,6 +25,10 @@ public class ARManager : MonoBehaviour
     {
         SceneManager.LoadScene(2);
     }
+    public void ARStateOfMatterScene()
+    {
+        SceneManager.LoadScene(3);
+    }
     public void HomeScene()
     {
         SceneManager.LoadScene(0);
