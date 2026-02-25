@@ -7,11 +7,8 @@ public class StatesOfMatterManager : MonoBehaviour
     [Header("UI & Text")]
     public TextMeshPro stateLabel;
 
-    [Header("Mascot & Audio")]
-    public AudioSource mascotAudio;
-    public AudioClip solidAudio;
-    public AudioClip liquidAudio;
-    public AudioClip gasAudio;
+    [Header("SciLenceAR Assistant")]
+    public RobotMascot myRobot; // NEW: Links to the robot's brain
 
     [Header("Molecules")]
     public Rigidbody[] molecules;
@@ -40,7 +37,8 @@ public class StatesOfMatterManager : MonoBehaviour
         {
             currentState = 0;
             if (stateLabel != null) stateLabel.text = "SOLID";
-            PlayAudio(solidAudio);
+
+            if (myRobot != null) myRobot.ExplainState(0); // Tell Robot to talk about Solid
             MakeSolid();
         }
         // LIQUID (31 - 70)
@@ -48,7 +46,8 @@ public class StatesOfMatterManager : MonoBehaviour
         {
             currentState = 1;
             if (stateLabel != null) stateLabel.text = "LIQUID";
-            PlayAudio(liquidAudio);
+
+            if (myRobot != null) myRobot.ExplainState(1); // Tell Robot to talk about Liquid
             MakeLiquid();
         }
         // GAS (71 - 100)
@@ -56,18 +55,9 @@ public class StatesOfMatterManager : MonoBehaviour
         {
             currentState = 2;
             if (stateLabel != null) stateLabel.text = "GAS";
-            PlayAudio(gasAudio);
-            MakeGas();
-        }
-    }
 
-    void PlayAudio(AudioClip clip)
-    {
-        if (clip != null && mascotAudio != null)
-        {
-            mascotAudio.Stop();
-            mascotAudio.clip = clip;
-            mascotAudio.Play();
+            if (myRobot != null) myRobot.ExplainState(2); // Tell Robot to talk about Gas
+            MakeGas();
         }
     }
 
@@ -97,7 +87,6 @@ public class StatesOfMatterManager : MonoBehaviour
             rb.useGravity = false;
             rb.drag = 0f;
 
-            // Much smaller initial push so they don't explode through the walls
             Vector3 randomDir = new Vector3(Random.Range(-1f, 1f), Random.Range(0.5f, 1f), Random.Range(-1f, 1f)).normalized;
             rb.AddForce(randomDir * 1.5f, ForceMode.Impulse);
         }
@@ -105,33 +94,23 @@ public class StatesOfMatterManager : MonoBehaviour
 
     void FixedUpdate()
     {
-        // Add Device Tilt Sloshing ONLY during the Liquid state
         if (currentState == 1)
         {
             Vector3 tilt = Input.acceleration;
             Vector3 tiltForce = new Vector3(tilt.x, 0, tilt.y) * 15f;
-
-            foreach (Rigidbody rb in molecules)
-            {
-                rb.AddForce(tiltForce, ForceMode.Acceleration);
-            }
+            foreach (Rigidbody rb in molecules) rb.AddForce(tiltForce, ForceMode.Acceleration);
         }
 
-        // Keep Gas particles bouncing FOREVER, but SAFELY
         if (currentState == 2)
         {
-            float maxSpeed = 1.5f; // The strict speed limit!
-
+            float maxSpeed = 1.5f;
             foreach (Rigidbody rb in molecules)
             {
-                // 1. Give them a tiny gentle push if they slow down too much
                 if (rb.velocity.magnitude < 0.5f)
                 {
                     Vector3 randomDir = new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, 1f), Random.Range(-1f, 1f)).normalized;
                     rb.AddForce(randomDir * 0.2f, ForceMode.Impulse);
                 }
-
-                // 2. NEW: If they try to go faster than our maxSpeed, force them to slow down
                 if (rb.velocity.magnitude > maxSpeed)
                 {
                     rb.velocity = rb.velocity.normalized * maxSpeed;
