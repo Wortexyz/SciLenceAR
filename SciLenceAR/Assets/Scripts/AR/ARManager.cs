@@ -29,6 +29,10 @@ public class ARManager : MonoBehaviour
     {
         SceneManager.LoadScene(3);
     }
+    public void ARPhotosynthesisScene()
+    {
+        SceneManager.LoadScene(4);
+    }
     public void HomeScene()
     {
         SceneManager.LoadScene(0);

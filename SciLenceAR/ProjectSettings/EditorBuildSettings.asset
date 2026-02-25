@@ -17,6 +17,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/StateOfMaterARScene.unity
     guid: 79e4fc27ae9359d45bdb6c915703ffcb
+  - enabled: 1
+    path: Assets/Scenes/PhotoSynthesis.unity
+    guid: 97261b48ccec8b14d9404e85b75c4822
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 4035dcb98fc475f44af1107d2ad9b82e,
       type: 2}
