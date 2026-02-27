@@ -14,6 +14,9 @@ public class ARGestureManipulator : MonoBehaviour
     private ARRaycastManager raycastManager;
     static List<ARRaycastHit> hits = new List<ARRaycastHit>();
 
+    private bool isTouchOnUI = false;
+    private bool isDraggingObject = false; // NEW: Checks if we actually grabbed the 3D object
+
     void Awake()
     {
         raycastManager = FindObjectOfType<ARRaycastManager>();
@@ -21,30 +24,61 @@ public class ARGestureManipulator : MonoBehaviour
 
     void Update()
     {
-        if (Input.touchCount == 0) return;
-
-        // Block AR interaction if the user is touching a UI button (like the "Back" button)
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId))
+        // Reset everything when fingers leave the screen
+        if (Input.touchCount == 0)
+        {
+            isTouchOnUI = false;
+            isDraggingObject = false;
             return;
+        }
+
+        Touch touch0 = Input.GetTouch(0);
+
+        // --- CHECK WHAT WE ARE TOUCHING ---
+        if (touch0.phase == TouchPhase.Began)
+        {
+            // 1. Are we touching a UI button or slider?
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch0.fingerId))
+            {
+                isTouchOnUI = true;
+                return;
+            }
+
+            // 2. Are we actually touching the 3D AR Object?
+            Ray ray = Camera.main.ScreenPointToRay(touch0.position);
+            RaycastHit hit;
+
+            // Cast a physics laser from the camera to the screen touch point
+            if (Physics.Raycast(ray, out hit))
+            {
+                // If the laser hits this object or any of its children (like the beaker or robot)
+                if (hit.transform.IsChildOf(this.transform) || hit.transform == this.transform)
+                {
+                    isDraggingObject = true; // We grabbed it!
+                }
+            }
+        }
+
+        // If we touched UI, ignore the rest of the code
+        if (isTouchOnUI) return;
 
         // --- 1 FINGER: MOVE ---
         if (Input.touchCount == 1)
         {
-            Touch touch = Input.GetTouch(0);
-            if (touch.phase == TouchPhase.Moved)
+            // ONLY move if we successfully grabbed the object
+            if (touch0.phase == TouchPhase.Moved && isDraggingObject)
             {
-                MoveObject(touch.position);
+                MoveObject(touch0.position);
             }
         }
         // --- 2 FINGERS: SCALE & ROTATE ---
         else if (Input.touchCount == 2)
         {
-            Touch touch1 = Input.GetTouch(0);
-            Touch touch2 = Input.GetTouch(1);
+            Touch touch1 = Input.GetTouch(1);
 
-            if (touch1.phase == TouchPhase.Moved || touch2.phase == TouchPhase.Moved)
+            if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
             {
-                ScaleAndRotateObject(touch1, touch2);
+                ScaleAndRotateObject(touch0, touch1);
             }
         }
     }

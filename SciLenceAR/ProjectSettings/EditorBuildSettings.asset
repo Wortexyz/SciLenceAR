@@ -20,6 +20,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/PhotoSynthesis.unity
     guid: 97261b48ccec8b14d9404e85b75c4822
+  - enabled: 1
+    path: Assets/Scenes/NewtonScene.unity
+    guid: 3dda9e1d0e85bb44fae949f1a9d21afe
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 4035dcb98fc475f44af1107d2ad9b82e,
       type: 2}
