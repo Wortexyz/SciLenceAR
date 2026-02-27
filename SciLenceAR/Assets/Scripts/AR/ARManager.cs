@@ -41,4 +41,8 @@ public class ARManager : MonoBehaviour
     {
         SceneManager.LoadScene(5);
     }
+    public void CircuitScene()
+    {
+        SceneManager.LoadScene(6);
+    }
 }
