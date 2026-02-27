@@ -37,4 +37,8 @@ public class ARManager : MonoBehaviour
     {
         SceneManager.LoadScene(0);
     }
+    public void NewTonsLAW()
+    {
+        SceneManager.LoadScene(5);
+    }
 }
