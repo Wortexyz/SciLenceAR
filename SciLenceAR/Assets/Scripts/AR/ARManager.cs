@@ -45,4 +45,8 @@ public class ARManager : MonoBehaviour
     {
         SceneManager.LoadScene(6);
     }
+    public void BoylesScene()
+    {
+        SceneManager.LoadScene(7);
+    }
 }

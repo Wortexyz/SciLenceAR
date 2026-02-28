@@ -26,6 +26,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/CircuteScene.unity
     guid: 98c55d398cf077146a70df001324f76e
+  - enabled: 1
+    path: Assets/Scenes/BoylsScene.unity
+    guid: 52fa09a218d71af4ba00fe98a005e015
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 4035dcb98fc475f44af1107d2ad9b82e,
       type: 2}
