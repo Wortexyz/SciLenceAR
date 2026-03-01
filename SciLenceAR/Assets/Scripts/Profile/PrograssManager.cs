@@ -4,11 +4,28 @@ using System.Threading.Tasks;
 using Firebase.Auth;
 using Firebase.Firestore;
 using UnityEngine;
+using UnityEngine.UI; 
+using TMPro;
 
 public class ProgressManager : MonoBehaviour
 {
     FirebaseAuth auth;
     FirebaseFirestore db;
+
+    [Header("UI References")]
+    [SerializeField] private SubjectUI physicsUI;
+    [SerializeField] private SubjectUI chemistryUI;
+    [SerializeField] private SubjectUI biologyUI;
+    [SerializeField] private SubjectUI profilePhysicsUI;
+    [SerializeField] private SubjectUI profileChemistryUI;
+    [SerializeField] private SubjectUI profileBiologyUI;
+
+    [Serializable]
+    public struct SubjectUI
+    {
+        public Image progressBar; 
+        public TextMeshProUGUI percentageText; 
+    }
 
     void Awake()
     {
@@ -30,6 +47,26 @@ public class ProgressManager : MonoBehaviour
         }
     }
 
+    // --- NEW BUTTON-READY METHOD (ONE PARAMETER) ---
+    // This will definitely show in the dropdown!
+    // Enter value in Unity Inspector as: contentId,subject
+    public void MarkCompletedForButton(string commaSeparatedInput)
+    {
+        string[] parts = commaSeparatedInput.Split(',');
+        if (parts.Length < 2)
+        {
+            Debug.LogError("Please enter: contentId,subject (e.g. lesson1,Physics)");
+            return;
+        }
+        
+        string cid = parts[0].Trim();
+        string sub = parts[1].Trim();
+        
+        _ = MarkCompletedAsync(cid, sub);
+    }
+
+    // --- EXISTING METHODS (UNCHANGED LOGIC) ---
+
     public async Task SaveProgressAsync(string contentId, double lastPlayTime, bool lastWasPlaying, bool notesRead, string subject = "Unknown", bool completed = false)
     {
         if (Uid == null) return;
@@ -44,7 +81,7 @@ public class ProgressManager : MonoBehaviour
             {"updatedAt", Timestamp.GetCurrentTimestamp()}
         };
         await docRef.SetAsync(data, SetOptions.MergeAll);
-        Debug.Log($"Saved progress for {contentId}");
+        await UpdateAllSubjectProgressUI();
     }
 
     public async Task<UserProgress> GetProgressAsync(string contentId)
@@ -62,19 +99,56 @@ public class ProgressManager : MonoBehaviour
         return p;
     }
 
-    public async Task MarkCompletedAsync(string contentId)
+    public async Task MarkCompletedAsync(string contentId, string subject)
     {
         if (Uid == null) return;
         var docRef = db.Collection("users").Document(Uid).Collection("progress").Document(contentId);
         var updates = new Dictionary<string, object>() {
             {"completed", true},
+            {"subject", subject}, 
             {"completedAt", Timestamp.GetCurrentTimestamp()},
             {"updatedAt", Timestamp.GetCurrentTimestamp()}
         };
         await docRef.SetAsync(updates, SetOptions.MergeAll);
+        await UpdateAllSubjectProgressUI();
+    }
+
+    public async Task UpdateAllSubjectProgressUI()
+    {
+        await RefreshSubjectUI("Physics", physicsUI, profilePhysicsUI);
+        await RefreshSubjectUI("Chemistry", chemistryUI, profileChemistryUI);
+        await RefreshSubjectUI("Biology", biologyUI, profileBiologyUI);
+    }
+
+    private async Task RefreshSubjectUI(string subjectName, SubjectUI panelUI, SubjectUI profileUI)
+    {
+        if (Uid == null || db == null) return;
+
+        Query query = db.Collection("users").Document(Uid).Collection("progress")
+            .WhereEqualTo("subject", subjectName)
+            .WhereEqualTo("completed", true);
+
+        QuerySnapshot snapshot = await query.GetSnapshotAsync();
+        
+        int completedCount = snapshot.Count;
+        int totalContent = 3; 
+        float percentage = Mathf.Clamp01((float)completedCount / totalContent);
+
+        UpdateUISlot(panelUI, percentage);
+        UpdateUISlot(profileUI, percentage);
+    }
+
+    private void UpdateUISlot(SubjectUI ui, float fillAmount)
+    {
+        if (ui.progressBar != null)
+            ui.progressBar.fillAmount = fillAmount;
+
+        if (ui.percentageText != null)
+            ui.percentageText.text = $"{(fillAmount * 100):0}%";
     }
 }
 
+[Serializable]
 public class UserProgress
 {
     public string contentId;
