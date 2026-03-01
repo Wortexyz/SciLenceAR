@@ -49,4 +49,12 @@ public class ARManager : MonoBehaviour
     {
         SceneManager.LoadScene(7);
     }
+    public void PlantCell()
+    {
+        SceneManager.LoadScene(8);
+    }
+    public void AtomicScene()
+    {
+        SceneManager.LoadScene(9);
+    }
 }

@@ -32,6 +32,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Cell structure.unity
     guid: af3a617eb15fade44a217a5a9b048c8c
+  - enabled: 1
+    path: Assets/Scenes/Atomcene.unity
+    guid: d0c33891edb8e3646a7f62431d2ea755
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 4035dcb98fc475f44af1107d2ad9b82e,
       type: 2}
