@@ -4,6 +4,15 @@ using TMPro; // Note: Use UnityEngine.UI if not using TextMeshPro
 
 public class PhotosynthesisController : MonoBehaviour
 {
+    [Header("Audio Settings")]
+    public AudioSource audioSource;
+    public AudioClip tapSunClip;
+    public AudioClip sunlightExplanationClip;
+    public AudioClip tapPlantClip;
+    public AudioClip plantExplanationClip;
+    public AudioClip tapByproductClip;
+    public AudioClip byproductExplanationClip;
+
     [Header("Instructional Text")]
     public GameObject tapSunText;
     public GameObject tapPlantText;
@@ -33,49 +42,68 @@ public class PhotosynthesisController : MonoBehaviour
         ResetAll();
         tapSunText.SetActive(true);
         ToggleGroup(sunButtons, true);
+
+        // Play initial audio
+        PlayAudio(tapSunClip);
     }
 
     // 1. Linked to Sun Buttons
     public void OnSunButtonClick()
     {
-        tapSunText.SetActive(false); // Hide "Tap on the Sun" immediately
+        audioSource.Stop(); // Stop "Tap on the Sun"
+        tapSunText.SetActive(false); 
         coneObject.SetActive(true);
         sunLabel.SetActive(true);
         ToggleGroup(sunButtons, false); 
         
-        StartCoroutine(WaitToShowPlantTask());
+        StartCoroutine(HandleSunlightExplanation());
     }
 
-    IEnumerator WaitToShowPlantTask()
+    IEnumerator HandleSunlightExplanation()
     {
-        yield return new WaitForSeconds(2f);
-        tapPlantText.SetActive(true); // Show "Tap on the Plant"
+        PlayAudio(sunlightExplanationClip);
+        
+        // Wait for explanation to finish
+        yield return new WaitWhile(() => audioSource.isPlaying);
+        yield return new WaitForSeconds(0.5f); // Brief pause for natural flow
+
+        tapPlantText.SetActive(true); 
         ToggleGroup(plantButtons, true);
+        PlayAudio(tapPlantClip);
     }
 
     // 2. Linked to Plant Buttons
     public void OnPlantButtonClick()
     {
-        tapPlantText.SetActive(false); // Hide "Tap on the Plant" immediately
+        audioSource.Stop(); // Stop "Tap on the Plant"
+        tapPlantText.SetActive(false); 
         waterObject.SetActive(true);
         carbonParticles.SetActive(true);
         plantLabel.SetActive(true);
         
-        sunLabel.SetActive(false); // Hide Sun Label
+        sunLabel.SetActive(false); 
         ToggleGroup(plantButtons, false);
 
-        StartCoroutine(WaitToShowByproduct());
+        StartCoroutine(HandlePlantExplanation());
     }
 
-    IEnumerator WaitToShowByproduct()
+    IEnumerator HandlePlantExplanation()
     {
-        yield return new WaitForSeconds(2f);
+        PlayAudio(plantExplanationClip);
+
+        // Wait for explanation to finish
+        yield return new WaitWhile(() => audioSource.isPlaying);
+        yield return new WaitForSeconds(0.5f);
+
         byproductButton.SetActive(true);
+        PlayAudio(tapByproductClip);
     }
 
     // 3. Linked to Byproduct Button
     public void OnByproductButtonClick()
     {
+        audioSource.Stop(); // Stop "Tap on Byproduct"
+        
         // Clean up Plant phase
         waterObject.SetActive(false);
         carbonParticles.SetActive(false);
@@ -87,9 +115,20 @@ public class PhotosynthesisController : MonoBehaviour
         byproductLabel.SetActive(true);
         
         byproductButton.SetActive(false);
+
+        PlayAudio(byproductExplanationClip);
     }
 
     // Helper Functions
+    void PlayAudio(AudioClip clip)
+    {
+        if (clip != null && audioSource != null)
+        {
+            audioSource.clip = clip;
+            audioSource.Play();
+        }
+    }
+
     void ToggleGroup(GameObject[] objects, bool state)
     {
         foreach (GameObject obj in objects) if(obj != null) obj.SetActive(state);
