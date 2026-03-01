@@ -12,10 +12,12 @@ public class ProgressManager : MonoBehaviour
     FirebaseAuth auth;
     FirebaseFirestore db;
 
-    [Header("UI References")]
+    [Header("UI References (Assign in Inspector)")]
     [SerializeField] private SubjectUI physicsUI;
     [SerializeField] private SubjectUI chemistryUI;
     [SerializeField] private SubjectUI biologyUI;
+    
+    [Header("Profile UI References")]
     [SerializeField] private SubjectUI profilePhysicsUI;
     [SerializeField] private SubjectUI profileChemistryUI;
     [SerializeField] private SubjectUI profileBiologyUI;
@@ -33,6 +35,15 @@ public class ProgressManager : MonoBehaviour
         db = FirebaseFirestore.DefaultInstance;
     }
 
+    // Ensure the UI updates when the game starts
+    async void Start()
+    {
+        if (auth.CurrentUser != null)
+        {
+            await UpdateAllSubjectProgressUI();
+        }
+    }
+
     string Uid
     {
         get
@@ -40,32 +51,37 @@ public class ProgressManager : MonoBehaviour
             var u = auth.CurrentUser;
             if (u == null)
             {
-                Debug.LogError("No authenticated user. Make sure user signed in.");
+                Debug.LogError("ProgressManager: No authenticated user found!");
                 return null;
             }
             return u.UserId;
         }
     }
 
-    // --- NEW BUTTON-READY METHOD (ONE PARAMETER) ---
-    // This will definitely show in the dropdown!
-    // Enter value in Unity Inspector as: contentId,subject
+    // --- BUTTON-READY METHOD ---
     public void MarkCompletedForButton(string commaSeparatedInput)
     {
+        if (string.IsNullOrEmpty(commaSeparatedInput))
+        {
+            Debug.LogError("Button Input is empty!");
+            return;
+        }
+
         string[] parts = commaSeparatedInput.Split(',');
         if (parts.Length < 2)
         {
-            Debug.LogError("Please enter: contentId,subject (e.g. lesson1,Physics)");
+            Debug.LogError($"Invalid Button Input: '{commaSeparatedInput}'. Format must be: contentId,Subject");
             return;
         }
         
         string cid = parts[0].Trim();
         string sub = parts[1].Trim();
         
+        Debug.Log($"Button Clicked! Mark {cid} as completed for {sub}");
         _ = MarkCompletedAsync(cid, sub);
     }
 
-    // --- EXISTING METHODS (UNCHANGED LOGIC) ---
+    // --- FIREBASE LOGIC ---
 
     public async Task SaveProgressAsync(string contentId, double lastPlayTime, bool lastWasPlaying, bool notesRead, string subject = "Unknown", bool completed = false)
     {
@@ -90,6 +106,7 @@ public class ProgressManager : MonoBehaviour
         var docRef = db.Collection("users").Document(Uid).Collection("progress").Document(contentId);
         var snapshot = await docRef.GetSnapshotAsync();
         if (!snapshot.Exists) return null;
+        
         var p = new UserProgress();
         p.contentId = contentId;
         p.lastPlayTime = snapshot.ContainsField("lastPlayTime") ? Convert.ToDouble(snapshot.GetValue<double>("lastPlayTime")) : 0;
@@ -110,6 +127,9 @@ public class ProgressManager : MonoBehaviour
             {"updatedAt", Timestamp.GetCurrentTimestamp()}
         };
         await docRef.SetAsync(updates, SetOptions.MergeAll);
+        
+        // Brief delay ensures Firestore has indexed the write before we read it back for the UI
+        await Task.Delay(500); 
         await UpdateAllSubjectProgressUI();
     }
 
@@ -124,27 +144,43 @@ public class ProgressManager : MonoBehaviour
     {
         if (Uid == null || db == null) return;
 
-        Query query = db.Collection("users").Document(Uid).Collection("progress")
-            .WhereEqualTo("subject", subjectName)
-            .WhereEqualTo("completed", true);
+        try 
+        {
+            Query query = db.Collection("users").Document(Uid).Collection("progress")
+                .WhereEqualTo("subject", subjectName)
+                .WhereEqualTo("completed", true);
 
-        QuerySnapshot snapshot = await query.GetSnapshotAsync();
-        
-        int completedCount = snapshot.Count;
-        int totalContent = 3; 
-        float percentage = Mathf.Clamp01((float)completedCount / totalContent);
+            QuerySnapshot snapshot = await query.GetSnapshotAsync();
+            
+            int completedCount = snapshot.Count;
+            int totalContent = 3; // Ensure this matches your total lesson count
+            float percentage = Mathf.Clamp01((float)completedCount / totalContent);
 
-        UpdateUISlot(panelUI, percentage);
-        UpdateUISlot(profileUI, percentage);
+            UpdateUISlot(panelUI, percentage);
+            UpdateUISlot(profileUI, percentage);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Error fetching {subjectName} progress: {e.Message}");
+        }
     }
 
     private void UpdateUISlot(SubjectUI ui, float fillAmount)
     {
+        // Must happen on main thread - checking if we are in play mode
         if (ui.progressBar != null)
+        {
+            // Set image type to Filled automatically if it isn't
+            if(ui.progressBar.type != Image.Type.Filled) 
+                ui.progressBar.type = Image.Type.Filled;
+                
             ui.progressBar.fillAmount = fillAmount;
+        }
 
         if (ui.percentageText != null)
+        {
             ui.percentageText.text = $"{(fillAmount * 100):0}%";
+        }
     }
 }
 
