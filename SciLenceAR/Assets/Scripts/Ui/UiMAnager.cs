@@ -74,8 +74,6 @@ public class UIManager : MonoBehaviour
         if (biologyPanel) biologyPanel.SetActive(false);
 
         if (resetPasswordPanel) resetPasswordPanel.SetActive(false);
-
-       
     }
 
     // -------------------------------------------------------
@@ -168,13 +166,14 @@ public class UIManager : MonoBehaviour
     }
 
     // -------------------------------------------------------
-    // PROFILE PANEL
+    // PROFILE PANEL - Modified to ensure Singleton Persistence
     // -------------------------------------------------------
 
     public void OpenProfilePannel()
     {
-        if (ProfilePannel) ProfilePannel.SetActive(true);
-        if (subjectPanel) subjectPanel.SetActive(false);
+        // Use 'I' to ensure we are talking to the persistent instance
+        if (I.ProfilePannel) I.ProfilePannel.SetActive(true);
+        if (I.subjectPanel) I.subjectPanel.SetActive(false);
 
         var pm = FindObjectOfType<ProfileManager>();
         if (pm != null) pm.RefreshProfile();
@@ -182,17 +181,13 @@ public class UIManager : MonoBehaviour
 
     public void closeProfilePannel()
     {
-        if (ProfilePannel) ProfilePannel.SetActive(false);
-        if (subjectPanel) subjectPanel.SetActive(true);
+        if (I.ProfilePannel) I.ProfilePannel.SetActive(false);
+        if (I.subjectPanel) I.subjectPanel.SetActive(true);
     }
 
     // -------------------------------------------------------
     // VIDEO / NOTES / AR (unchanged)
     // -------------------------------------------------------
-
-    
-
-    
 
     async Task<bool> DownloadFileAsync(string url, string localPath)
     {
@@ -214,8 +209,4 @@ public class UIManager : MonoBehaviour
         }
         return false;
     }
-
-    
-
-  
 }
