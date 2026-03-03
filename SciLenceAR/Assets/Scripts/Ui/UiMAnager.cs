@@ -22,7 +22,7 @@ public class UIManager : MonoBehaviour
 
     [Header("Reset Password")]
     public GameObject resetPasswordPanel;
-    public InputField resetEmailField;       // Using Unity InputField (your choice)
+    public InputField resetEmailField;       
     public Button resetSubmitButton;
     public TMP_Text resetStatusText;
 
@@ -53,27 +53,22 @@ public class UIManager : MonoBehaviour
 
     void Awake()
     {
-        if (I == null)
-        {
-            I = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-            return;
-        }
+       
+        I = this;
 
-      
+        
+
         if (arRunningPanel) arRunningPanel.SetActive(false);
 
-        if (homePanel) homePanel.SetActive(false);
+       
+        if (homePanel) homePanel.SetActive(true);
+
         if (subjectPanel) subjectPanel.SetActive(false);
         if (physicsPanel) physicsPanel.SetActive(false);
         if (chemistryPanel) chemistryPanel.SetActive(false);
         if (biologyPanel) biologyPanel.SetActive(false);
-
         if (resetPasswordPanel) resetPasswordPanel.SetActive(false);
+        if (ProfilePannel) ProfilePannel.SetActive(false);
     }
 
     // -------------------------------------------------------
@@ -171,7 +166,7 @@ public class UIManager : MonoBehaviour
 
     public void OpenProfilePannel()
     {
-        // Use 'I' to ensure we are talking to the persistent instance
+        
         if (I.ProfilePannel) I.ProfilePannel.SetActive(true);
         if (I.subjectPanel) I.subjectPanel.SetActive(false);
 

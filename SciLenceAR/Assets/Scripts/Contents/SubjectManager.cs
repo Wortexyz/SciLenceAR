@@ -8,7 +8,7 @@ public class SubjectManager : MonoBehaviour
     public GameObject subjectPanel;    // The main subject selection panel (physics/chemistry/biology buttons)
     public GameObject physicsPanel;
     public GameObject chemistryPanel;
-    public GameObject biologyPanel;
+    public GameObject biologyPanel,profilePannel;
 
     private void Awake()
     {
@@ -36,6 +36,7 @@ public class SubjectManager : MonoBehaviour
         if (physicsPanel) physicsPanel.SetActive(false);
         if (chemistryPanel) chemistryPanel.SetActive(false);
         if (biologyPanel) biologyPanel.SetActive(false);
+        
     }
 
     // Opens the main subject selection panel
@@ -68,6 +69,11 @@ public class SubjectManager : MonoBehaviour
     public void BackToSubjectPanel()
     {   
         OpenSubjectPanel();
+    }
+    public void OpenProfile()
+    {
+        HideAll();
+        subjectPanel.SetActive(true);
     }
 
 }
