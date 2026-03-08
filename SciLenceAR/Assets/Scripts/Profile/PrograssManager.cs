@@ -12,6 +12,9 @@ public class ProgressManager : MonoBehaviour
     FirebaseAuth auth;
     FirebaseFirestore db;
 
+    [Header("Settings")]
+    [SerializeField] private int totalLessonsPerSubject = 3;
+
     [Header("UI References (Assign in Inspector)")]
     [SerializeField] private SubjectUI physicsUI;
     [SerializeField] private SubjectUI chemistryUI;
@@ -33,6 +36,9 @@ public class ProgressManager : MonoBehaviour
     {
         auth = FirebaseAuth.DefaultInstance;
         db = FirebaseFirestore.DefaultInstance;
+        
+        // Optional: Disable persistence if you want to ensure it ALWAYS pulls from the cloud
+        // FirebaseFirestore.DefaultInstance.Settings.PersistenceEnabled = false;
     }
 
     // Ensure the UI updates when the game starts
@@ -85,7 +91,8 @@ public class ProgressManager : MonoBehaviour
 
     public async Task SaveProgressAsync(string contentId, double lastPlayTime, bool lastWasPlaying, bool notesRead, string subject = "Unknown", bool completed = false)
     {
-        if (Uid == null) return;
+        if (string.IsNullOrEmpty(Uid)) return;
+        
         var docRef = db.Collection("users").Document(Uid).Collection("progress").Document(contentId);
         var data = new Dictionary<string, object>
         {
@@ -96,20 +103,23 @@ public class ProgressManager : MonoBehaviour
             {"subject", subject},
             {"updatedAt", Timestamp.GetCurrentTimestamp()}
         };
+        
         await docRef.SetAsync(data, SetOptions.MergeAll);
         await UpdateAllSubjectProgressUI();
     }
 
     public async Task<UserProgress> GetProgressAsync(string contentId)
     {
-        if (Uid == null) return null;
+        if (string.IsNullOrEmpty(Uid)) return null;
+        
         var docRef = db.Collection("users").Document(Uid).Collection("progress").Document(contentId);
         var snapshot = await docRef.GetSnapshotAsync();
+        
         if (!snapshot.Exists) return null;
         
         var p = new UserProgress();
         p.contentId = contentId;
-        p.lastPlayTime = snapshot.ContainsField("lastPlayTime") ? Convert.ToDouble(snapshot.GetValue<double>("lastPlayTime")) : 0;
+        p.lastPlayTime = snapshot.ContainsField("lastPlayTime") ? Convert.ToDouble(snapshot.GetValue<object>("lastPlayTime")) : 0;
         p.lastWasPlaying = snapshot.ContainsField("lastWasPlaying") ? snapshot.GetValue<bool>("lastWasPlaying") : false;
         p.notesRead = snapshot.ContainsField("notesRead") ? snapshot.GetValue<bool>("notesRead") : false;
         p.completed = snapshot.ContainsField("completed") ? snapshot.GetValue<bool>("completed") : false;
@@ -118,7 +128,8 @@ public class ProgressManager : MonoBehaviour
 
     public async Task MarkCompletedAsync(string contentId, string subject)
     {
-        if (Uid == null) return;
+        if (string.IsNullOrEmpty(Uid)) return;
+
         var docRef = db.Collection("users").Document(Uid).Collection("progress").Document(contentId);
         var updates = new Dictionary<string, object>() {
             {"completed", true},
@@ -126,15 +137,20 @@ public class ProgressManager : MonoBehaviour
             {"completedAt", Timestamp.GetCurrentTimestamp()},
             {"updatedAt", Timestamp.GetCurrentTimestamp()}
         };
+        
+        // Use SetAsync with MergeAll to ensure we don't overwrite other fields if they exist
         await docRef.SetAsync(updates, SetOptions.MergeAll);
         
-        // Brief delay ensures Firestore has indexed the write before we read it back for the UI
-        await Task.Delay(500); 
+        // Small delay to let the Firestore backend catch up
+        await Task.Delay(1000); 
         await UpdateAllSubjectProgressUI();
     }
 
     public async Task UpdateAllSubjectProgressUI()
     {
+        // Added check to ensure we don't update UI if user logged out mid-process
+        if (string.IsNullOrEmpty(Uid)) return;
+
         await RefreshSubjectUI("Physics", physicsUI, profilePhysicsUI);
         await RefreshSubjectUI("Chemistry", chemistryUI, profileChemistryUI);
         await RefreshSubjectUI("Biology", biologyUI, profileBiologyUI);
@@ -142,19 +158,20 @@ public class ProgressManager : MonoBehaviour
 
     private async Task RefreshSubjectUI(string subjectName, SubjectUI panelUI, SubjectUI profileUI)
     {
-        if (Uid == null || db == null) return;
+        if (string.IsNullOrEmpty(Uid) || db == null) return;
 
         try 
         {
+            // We query specifically for documents where the 'subject' matches AND 'completed' is true
             Query query = db.Collection("users").Document(Uid).Collection("progress")
                 .WhereEqualTo("subject", subjectName)
                 .WhereEqualTo("completed", true);
 
-            QuerySnapshot snapshot = await query.GetSnapshotAsync();
+            // Source.Server forces it to fetch from Firebase Cloud, not local cache
+            QuerySnapshot snapshot = await query.GetSnapshotAsync(Source.Server);
             
             int completedCount = snapshot.Count;
-            int totalContent = 3; // Ensure this matches your total lesson count
-            float percentage = Mathf.Clamp01((float)completedCount / totalContent);
+            float percentage = Mathf.Clamp01((float)completedCount / totalLessonsPerSubject);
 
             UpdateUISlot(panelUI, percentage);
             UpdateUISlot(profileUI, percentage);
@@ -167,10 +184,8 @@ public class ProgressManager : MonoBehaviour
 
     private void UpdateUISlot(SubjectUI ui, float fillAmount)
     {
-        // Must happen on main thread - checking if we are in play mode
         if (ui.progressBar != null)
         {
-            // Set image type to Filled automatically if it isn't
             if(ui.progressBar.type != Image.Type.Filled) 
                 ui.progressBar.type = Image.Type.Filled;
                 
