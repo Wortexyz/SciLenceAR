@@ -49,7 +49,7 @@ public class UIManager : MonoBehaviour
     [Header("AR/Other")]
     public GameObject arRunningPanel;
 
-    private UserProgress _pendingProgress = null;
+  
 
     void Awake()
     {

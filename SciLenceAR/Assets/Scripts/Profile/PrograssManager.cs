@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Firebase.Auth;
 using Firebase.Firestore;
 using UnityEngine;
-using UnityEngine.UI; 
+using UnityEngine.UI;
 using TMPro;
 
 public class ProgressManager : MonoBehaviour
@@ -19,7 +19,7 @@ public class ProgressManager : MonoBehaviour
     [SerializeField] private SubjectUI physicsUI;
     [SerializeField] private SubjectUI chemistryUI;
     [SerializeField] private SubjectUI biologyUI;
-    
+
     [Header("Profile UI References")]
     [SerializeField] private SubjectUI profilePhysicsUI;
     [SerializeField] private SubjectUI profileChemistryUI;
@@ -28,25 +28,39 @@ public class ProgressManager : MonoBehaviour
     [Serializable]
     public struct SubjectUI
     {
-        public Image progressBar; 
-        public TextMeshProUGUI percentageText; 
+        public Image progressBar;
+        public TextMeshProUGUI percentageText;
     }
 
     void Awake()
     {
         auth = FirebaseAuth.DefaultInstance;
         db = FirebaseFirestore.DefaultInstance;
-        
-        // Optional: Disable persistence if you want to ensure it ALWAYS pulls from the cloud
-        // FirebaseFirestore.DefaultInstance.Settings.PersistenceEnabled = false;
     }
 
-    // Ensure the UI updates when the game starts
-    async void Start()
+    void OnEnable()
+    {
+        if (auth != null)
+            auth.StateChanged += OnAuthStateChanged;
+    }
+
+    void OnDisable()
+    {
+        if (auth != null)
+            auth.StateChanged -= OnAuthStateChanged;
+    }
+
+    private async void OnAuthStateChanged(object sender, EventArgs e)
     {
         if (auth.CurrentUser != null)
         {
+            Debug.Log("[ProgressManager] User signed in. Fetching progress...");
             await UpdateAllSubjectProgressUI();
+        }
+        else
+        {
+            Debug.Log("[ProgressManager] User signed out. Resetting progress UI.");
+            ResetAllProgressUI();
         }
     }
 
@@ -55,11 +69,7 @@ public class ProgressManager : MonoBehaviour
         get
         {
             var u = auth.CurrentUser;
-            if (u == null)
-            {
-                Debug.LogError("ProgressManager: No authenticated user found!");
-                return null;
-            }
+            if (u == null) return null;
             return u.UserId;
         }
     }
@@ -67,11 +77,7 @@ public class ProgressManager : MonoBehaviour
     // --- BUTTON-READY METHOD ---
     public void MarkCompletedForButton(string commaSeparatedInput)
     {
-        if (string.IsNullOrEmpty(commaSeparatedInput))
-        {
-            Debug.LogError("Button Input is empty!");
-            return;
-        }
+        if (string.IsNullOrEmpty(commaSeparatedInput)) return;
 
         string[] parts = commaSeparatedInput.Split(',');
         if (parts.Length < 2)
@@ -79,77 +85,45 @@ public class ProgressManager : MonoBehaviour
             Debug.LogError($"Invalid Button Input: '{commaSeparatedInput}'. Format must be: contentId,Subject");
             return;
         }
-        
+
         string cid = parts[0].Trim();
         string sub = parts[1].Trim();
-        
+
         Debug.Log($"Button Clicked! Mark {cid} as completed for {sub}");
         _ = MarkCompletedAsync(cid, sub);
     }
 
     // --- FIREBASE LOGIC ---
-
-    public async Task SaveProgressAsync(string contentId, double lastPlayTime, bool lastWasPlaying, bool notesRead, string subject = "Unknown", bool completed = false)
-    {
-        if (string.IsNullOrEmpty(Uid)) return;
-        
-        var docRef = db.Collection("users").Document(Uid).Collection("progress").Document(contentId);
-        var data = new Dictionary<string, object>
-        {
-            {"lastPlayTime", lastPlayTime},
-            {"lastWasPlaying", lastWasPlaying},
-            {"notesRead", notesRead},
-            {"completed", completed},
-            {"subject", subject},
-            {"updatedAt", Timestamp.GetCurrentTimestamp()}
-        };
-        
-        await docRef.SetAsync(data, SetOptions.MergeAll);
-        await UpdateAllSubjectProgressUI();
-    }
-
-    public async Task<UserProgress> GetProgressAsync(string contentId)
-    {
-        if (string.IsNullOrEmpty(Uid)) return null;
-        
-        var docRef = db.Collection("users").Document(Uid).Collection("progress").Document(contentId);
-        var snapshot = await docRef.GetSnapshotAsync();
-        
-        if (!snapshot.Exists) return null;
-        
-        var p = new UserProgress();
-        p.contentId = contentId;
-        p.lastPlayTime = snapshot.ContainsField("lastPlayTime") ? Convert.ToDouble(snapshot.GetValue<object>("lastPlayTime")) : 0;
-        p.lastWasPlaying = snapshot.ContainsField("lastWasPlaying") ? snapshot.GetValue<bool>("lastWasPlaying") : false;
-        p.notesRead = snapshot.ContainsField("notesRead") ? snapshot.GetValue<bool>("notesRead") : false;
-        p.completed = snapshot.ContainsField("completed") ? snapshot.GetValue<bool>("completed") : false;
-        return p;
-    }
-
     public async Task MarkCompletedAsync(string contentId, string subject)
     {
         if (string.IsNullOrEmpty(Uid)) return;
 
-        var docRef = db.Collection("users").Document(Uid).Collection("progress").Document(contentId);
+        // Combine subject and contentId to ensure the Document ID is 100% unique
+        string uniqueDocId = $"{subject}_{contentId}";
+
+        var docRef = db.Collection("users").Document(Uid).Collection("progress").Document(uniqueDocId);
+
         var updates = new Dictionary<string, object>() {
             {"completed", true},
-            {"subject", subject}, 
+            {"subject", subject},
+            {"originalContentId", contentId},
             {"completedAt", Timestamp.GetCurrentTimestamp()},
             {"updatedAt", Timestamp.GetCurrentTimestamp()}
         };
-        
-        // Use SetAsync with MergeAll to ensure we don't overwrite other fields if they exist
+
         await docRef.SetAsync(updates, SetOptions.MergeAll);
-        
-        // Small delay to let the Firestore backend catch up
-        await Task.Delay(1000); 
+
+        await Task.Delay(500);
         await UpdateAllSubjectProgressUI();
     }
 
     public async Task UpdateAllSubjectProgressUI()
     {
-        // Added check to ensure we don't update UI if user logged out mid-process
-        if (string.IsNullOrEmpty(Uid)) return;
+        if (string.IsNullOrEmpty(Uid))
+        {
+            ResetAllProgressUI();
+            return;
+        }
 
         await RefreshSubjectUI("Physics", physicsUI, profilePhysicsUI);
         await RefreshSubjectUI("Chemistry", chemistryUI, profileChemistryUI);
@@ -160,21 +134,27 @@ public class ProgressManager : MonoBehaviour
     {
         if (string.IsNullOrEmpty(Uid) || db == null) return;
 
-        try 
+        // Reset UI to 0 BEFORE querying so old user data never shows
+        UpdateUISlot(panelUI, 0f);
+        UpdateUISlot(profileUI, 0f);
+
+        try
         {
-            // We query specifically for documents where the 'subject' matches AND 'completed' is true
             Query query = db.Collection("users").Document(Uid).Collection("progress")
                 .WhereEqualTo("subject", subjectName)
                 .WhereEqualTo("completed", true);
 
-            // Source.Server forces it to fetch from Firebase Cloud, not local cache
+            // Fetch from Server to bypass local cache issues
             QuerySnapshot snapshot = await query.GetSnapshotAsync(Source.Server);
-            
+
             int completedCount = snapshot.Count;
             float percentage = Mathf.Clamp01((float)completedCount / totalLessonsPerSubject);
 
-            UpdateUISlot(panelUI, percentage);
-            UpdateUISlot(profileUI, percentage);
+            if (completedCount > 0)
+            {
+                UpdateUISlot(panelUI, percentage);
+                UpdateUISlot(profileUI, percentage);
+            }
         }
         catch (Exception e)
         {
@@ -186,9 +166,9 @@ public class ProgressManager : MonoBehaviour
     {
         if (ui.progressBar != null)
         {
-            if(ui.progressBar.type != Image.Type.Filled) 
+            if (ui.progressBar.type != Image.Type.Filled)
                 ui.progressBar.type = Image.Type.Filled;
-                
+
             ui.progressBar.fillAmount = fillAmount;
         }
 
@@ -197,14 +177,14 @@ public class ProgressManager : MonoBehaviour
             ui.percentageText.text = $"{(fillAmount * 100):0}%";
         }
     }
-}
 
-[Serializable]
-public class UserProgress
-{
-    public string contentId;
-    public double lastPlayTime;
-    public bool lastWasPlaying;
-    public bool notesRead;
-    public bool completed;
+    private void ResetAllProgressUI()
+    {
+        UpdateUISlot(physicsUI, 0f);
+        UpdateUISlot(profilePhysicsUI, 0f);
+        UpdateUISlot(chemistryUI, 0f);
+        UpdateUISlot(profileChemistryUI, 0f);
+        UpdateUISlot(biologyUI, 0f);
+        UpdateUISlot(profileBiologyUI, 0f);
+    }
 }
